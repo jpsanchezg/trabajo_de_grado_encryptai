@@ -1,12 +1,36 @@
+BLOCK_SIZE = 64
+KEY_SIZE = 16
+
 def hex_to_binary(hex_string):
     return ''.join(format(int(c, 16), '04b') for c in hex_string)
 
+
 def binary_to_hex(binary_string):
-    return hex(int(binary_string, 2))[2:]
+    try:
+        decimal_value = int(binary_string, 2)
+        hex_value = hex(decimal_value)[2:]
+        # Ensure the hexadecimal value has an even length by padding with zeros if needed
+        hex_value = hex_value.zfill((len(hex_value) + 1) // 2 * 2)
+        return hex_value
+    except ValueError as e:
+        print(f"Error converting binary to hex: {e}")
+        print(f"Input binary string: {binary_string}")
+        return None
+
 def permute(initial, permutation):
     return [initial[i - 1] for i in permutation]
 
+
 def initial_permutation(data_block):
+    if not isinstance(data_block, str):
+        raise TypeError("Input data block must be a binary string")
+
+    # Calculate the required padding
+    padding_size = (64 - len(data_block) % 64) % 64
+
+    # Pad the data block with zeros
+    data_block += '0' * padding_size
+
     permutation = [
         58, 50, 42, 34, 26, 18, 10, 2,
         60, 52, 44, 36, 28, 20, 12, 4,
@@ -108,10 +132,11 @@ def feistel_network(right_block, subkey):
     expanded_block = expansion_permutation(right_block)
     xor_result = xor(expanded_block, subkey)
 
-    print("xor_result:", xor_result)
+    # Remove the print statement for better readability
 
     sbox_inputs = [xor_result[i:i+6] for i in range(0, 48, 6)]
-    sbox_outputs = [substitute(sbox_input, sbox) for sbox_input, sbox in zip(sbox_inputs, sboxes)]
+    sbox_outputs = [substitute(sbox_input, sbox)
+                    for sbox_input, sbox in zip(sbox_inputs, sboxes)]
 
     sbox_output = ''.join(sbox_outputs)
     permuted_block = permute(sbox_output, straight_permutation)
@@ -158,44 +183,153 @@ sboxes = [[[14, 4, 13, 1, 2, 15, 11, 8, 3, 10, 6, 12, 5, 9, 0, 7],
          [2, 1, 14, 7, 4, 10, 8, 13, 15, 12, 9, 0, 3, 5, 6, 11]]]
 
 
-
 def des_encrypt_block(data_block, subkeys):
+    # Initial permutation
     data_block = initial_permutation(data_block)
-    left_block, right_block = data_block[:32], data_block[32:]
 
+    # Split into left and right halves
+    left_half, right_half = data_block[:32], data_block[32:]
+
+    # 16 rounds of Feistel network
     for round_num in range(1, 17):
-        left_block, right_block = right_block, xor(left_block, feistel_network(right_block, subkeys[round_num]))
+        # Feistel network
+        left_half, right_half = right_half, xor(
+            left_half, feistel_network(right_half, subkeys[round_num]))
 
-    encrypted_block = final_permutation(right_block + left_block)
+    # Final permutation
+    encrypted_block = final_permutation(right_half + left_half)
+
     return ''.join(encrypted_block)
 
-
 def des_encrypt_hex(plaintext_hex, key_hex):
-    if len(plaintext_hex) % 16 != 0 or len(key_hex) != 16:
-        raise ValueError("Invalid input size. Plaintext should be in multiples of 16 characters, and the key should be 16 characters long.")
+    # Check input sizes
+    if len(plaintext_hex) % (2 * BLOCK_SIZE // 8) != 0 or len(key_hex) != 2 * (BLOCK_SIZE // 8):
+        raise ValueError(
+            "Invalid input size. Plaintext should be in multiples of 16 characters, and the key should be 16 characters long.")
 
+    # Convert hex to binary
     plaintext_binary = hex_to_binary(plaintext_hex)
     key_binary = hex_to_binary(key_hex)
 
+    # Generate subkeys
     subkeys = generate_subkeys(key_binary)
-    plaintext_blocks = [plaintext_binary[i:i+64] for i in range(0, len(plaintext_binary), 64)]
 
-    encrypted_blocks = [des_encrypt_block(block, subkeys) for block in plaintext_blocks]
+    # Break plaintext into blocks
+    plaintext_blocks = [plaintext_binary[i:i+BLOCK_SIZE]
+                        for i in range(0, len(plaintext_binary), BLOCK_SIZE)]
+
+    # Encrypt each block
+    encrypted_blocks = [des_encrypt_block(
+        block, subkeys) for block in plaintext_blocks]
+
+    # Combine encrypted blocks
     ciphertext_binary = ''.join(encrypted_blocks)
 
-    return binary_to_hex(ciphertext_binary)
+    # Convert binary to hex
+    ciphertext_hex = binary_to_hex(ciphertext_binary)
+
+    return ciphertext_hex
+
+
+
 def des_encrypt_ai(inputs):
+
     if len(inputs) != 2:
         raise ValueError("AI should provide a list of two elements: [plaintext_hex, key_hex]")
 
     plaintext_hex, key_hex = inputs
     return des_encrypt_hex(plaintext_hex, key_hex)
+
+
+def des_decrypt_block(data_block, subkeys):
+    # Initial permutation
+    data_block = initial_permutation(data_block)
+
+    # Split into left and right halves
+    left_half, right_half = data_block[:32], data_block[32:]
+
+    # 16 rounds of Feistel network in reverse order
+    for round_num in range(16, 0, -1):
+        # Feistel network
+
+        right_half, left_half = xor(right_half, feistel_network(
+            left_half, subkeys[round_num])), right_half
+  
+
+    # Final permutation
+    decrypted_block = final_permutation(left_half + right_half)
+
+    return ''.join(decrypted_block)
+
+
+def des_decrypt_hex(ciphertext_hex, key_hex):
+    if len(ciphertext_hex) % (2 * BLOCK_SIZE // 8) != 0 or len(key_hex) != 2 * (BLOCK_SIZE // 8):
+        raise ValueError(
+            "Invalid input size. Ciphertext should be in multiples of 16 characters, and the key should be 16 characters long.")
+
+    # Convert hex to binary
+    ciphertext_binary = hex_to_binary(ciphertext_hex)
+    key_binary = hex_to_binary(key_hex)
+
+    # Generate subkeys in reverse order for decryption
+    subkeys = generate_subkeys(key_binary)
+    subkeys.reverse()
+
+    # Break ciphertext into blocks
+    ciphertext_blocks = [ciphertext_binary[i:i + BLOCK_SIZE]
+                         for i in range(0, len(ciphertext_binary), BLOCK_SIZE)]
+
+    # Decrypt each block
+    decrypted_blocks = [des_decrypt_block(
+        ciphertext_block, subkeys) for ciphertext_block in ciphertext_blocks]
+
+    # Combine decrypted blocks
+    plaintext_binary = ''.join(decrypted_blocks)
+
+    # Convert binary to hex
+    plaintext_hex = binary_to_hex(plaintext_binary)
+
+    return plaintext_hex
+
+
+def des_decrypt_ai(inputs):
+    if len(inputs) != 2:
+        raise ValueError(
+            "AI should provide a list of two elements: [ciphertext_hex, key_hex]")
+
+    ciphertext_hex, key_hex = inputs
+    return des_decrypt_hex(ciphertext_hex, key_hex)
+
+
+def pad_message(message):
+    # Pad message with zeros to make its length a multiple of 8
+    padding_size = (8 - len(message) % 8) % 8
+    padded_message = message + '\0' * padding_size
+    return padded_message
+
 def main():
-    inputs = ["123456ABCD132536", "AABB09182736CCDD"]  # Replace with AI-provided inputs
-    ciphertext = des_encrypt_ai(inputs)
-    print("Original Message (hex):", inputs[0])
-    print("Key (hex):", inputs[1])
+    inputs = ["686f6c61636f6d6f6573746173", "AABB09182736CCDD"]
+
+
+    plaintext_hex, key_hex = inputs
+
+    padded_message = pad_message(plaintext_hex)
+    binary_message = ''.join(format(ord(char), '08b') for char in padded_message)
+    print("Original Message (bin):", binary_message)
+
+    ciphertext = des_encrypt_hex(plaintext_hex, key_hex)
+    print("Original Message (hex):", plaintext_hex)
+    print("Key (hex):", key_hex)
     print("Encrypted Message (hex):", ciphertext)
+
+    decrypted_message = des_decrypt_hex(ciphertext, key_hex)
+    padded_message_decrypt = pad_message(decrypted_message)
+    binary_message_decrypt = ''.join(format(ord(char), '08b')
+                                     for char in padded_message_decrypt)
+
+    print("Decrypted Message (hex):", decrypted_message)
+    print("Decrypted Message (bin):", binary_message_decrypt)
+
 
 if __name__ == "__main__":
     main()
