@@ -302,13 +302,13 @@ def des_decrypt_ai(inputs):
 
 
 def pad_message(message):
-    # Pad message with zeros to make its length a multiple of 8
-    padding_size = (8 - len(message) % 8) % 8
-    padded_message = message + '\0' * padding_size
+    # Asegura que la longitud del mensaje sea un múltiplo de 16
+    padding_size = (16 - len(message) % 16) % 16
+    padded_message = message + '0' * (2 * padding_size)
     return padded_message
 
 def main():
-    inputs = ["686f6c61636f6d6f6573746173", "AABB09182736CCDD"]
+    inputs = ["686f6c61636f6d6f", "AABB09182736CCDD"]
 
 
     plaintext_hex, key_hex = inputs
