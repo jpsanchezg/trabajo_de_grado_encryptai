@@ -17,9 +17,9 @@ Para desactivar el entorno virtual de python se ejecuta el siguiente comando:
 
 ```bash
 deactivate
-```bash
+```
 
 Para correr el proyecto se usa el siguiente comando:
 ```bash
 python des.py
-```bash
+```
