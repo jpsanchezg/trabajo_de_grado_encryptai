@@ -1,6 +1,8 @@
 import numpy as np
 from tabulate import tabulate
-
+from pymoo.algorithms.soo.nonconvex.ga import GA
+from pymoo.problems import get_problem
+from pymoo.optimize import minimize
 
 
 class DES:
@@ -286,10 +288,36 @@ class AIMODEL:
     def print_table(table):
         for k, v in table.items():
             print(k, ':', v)
+    
+    @staticmethod
+    def geneticModel(population_size):
+        problem = SboxProblem()
+        algorithm = GA(pop_size=population_size)
+
+        res = minimize(problem,
+                       algorithm,
+                       seed=1,
+                       verbose=False)
+
+        best_solution = res.X
+        best_score = res.F[0]
+
+        return best_solution, best_score
 
 
+class SboxProblem(Problem):
+    def __init__(self, num_sboxes):
+        super().__init__(n_var=num_sboxes * 64, n_obj=1,
+                         n_constr=0, elementwise_evaluation=True)
+        self.num_sboxes = num_sboxes
 
-
+    def _evaluate(self, X, out, *args, **kwargs):
+        sboxes = []
+        for i in range(self.num_sboxes):
+            sbox = X[i*64:(i+1)*64].reshape(4, 16)
+            sboxes.append(sbox)
+        dlct_score = AIMODEL.calculate_dlct_score(sboxes)
+        out["F"] = dlct_score
 def main():
     pt = "0123456789ABCDEF"
     key = "133457799BBCDFF1"
@@ -335,16 +363,14 @@ def main():
     print("Decryption")
     plain_text = Decryption.decrypt(cipher_text, rkb, rk)
     print("Plain Text : ", plain_text)
-
-
-    sbox = DES.get_tables()[3][0].flatten()  # Flatten the 2D array to ensure it's one-dimensional
+    best_sbox = AIMODEL.geneticModel(population_size=100)
+    print("Best S-box: ", best_sbox)
+    sbox = DES.get_tables()[3][0].flatten()  
     print("Differential Table:")
     diff_table = AIMODEL.differential_table(sbox)
 
-    # Convertir los resultados en una lista de listas para tabulate
     table_data = [(input_diff, output_diff, count) for (input_diff, output_diff), count in diff_table.items()]
 
-    # Mostrar la tabla usando tabulate
     print(tabulate(table_data, headers=["Input Diff", "Output Diff", "Count"], tablefmt="grid"))
     #AIMODEL.print_table(diff_table)
 
