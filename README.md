@@ -1,25 +1,14 @@
-# trabajo_de_grado_encryptai
-
-Para poder ejecutar el entorno virtual de python se ejecuta el siguiente comando:
-
-Esto se hace para poder ejecutar el entorno virtual de python, el cual tiene todas las dependencias necesarias para ejecutar el proyecto.
-
-En windows:
+Primero antes que todo tener instalado poetry, si no lo tienes instalado puedes instalarlo con el siguiente comando:
 ```bash
-tesis-env\Scripts\activate
-```
-En Unix o MacOS:
-```bash
-source tesis-env/bin/activate
+pip install poetry
 ```
 
-Para desactivar el entorno virtual de python se ejecuta el siguiente comando:
-
+Si ya tienes poetry instalado, puedes instalar las dependencias del proyecto con el siguiente comando:
 ```bash
-deactivate
+poetry install
 ```
 
-Para correr el proyecto se usa el siguiente comando:
+Para correr el proyecto puedes ejecutar el siguiente comando:
 ```bash
-python des.py
+poetry run python des.py
 ```

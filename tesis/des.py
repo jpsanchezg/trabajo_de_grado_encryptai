@@ -1,7 +1,7 @@
 import numpy as np
 from tabulate import tabulate
 from pymoo.algorithms.soo.nonconvex.ga import GA
-from pymoo.problems import get_problem
+from pymoo.core.problem import Problem
 from pymoo.optimize import minimize
 
 
@@ -9,6 +9,7 @@ class DES:
     def __init__(self, key):
         self.key = DES.hex_to_bin(key)
     sboxes = None
+
     @staticmethod
     def hex_to_bin(s):
         mp = {'0': "0000", '1': "0001", '2': "0010", '3': "0011",
@@ -19,8 +20,6 @@ class DES:
         for char in s:
             binary += mp[char]
         return binary
-
-    
 
     def get_tables():
         initial_perm = [58, 50, 42, 34, 26, 18, 10, 2,
@@ -47,7 +46,6 @@ class DES:
             2, 8, 24, 14, 32, 27, 3, 9,
             19, 13, 30, 6, 22, 11, 4, 25
         ]
-
 
         final_perm = [
             40, 8, 48, 16, 56, 24, 64, 32,
@@ -106,10 +104,8 @@ class DES:
         # Generate round keys
         for i in range(16):
             # Perform left circular shift on left and right halves
-            left_half = left_half[left_shift_schedule[i]
-                :] + left_half[:left_shift_schedule[i]]
-            right_half = right_half[left_shift_schedule[i]
-                :] + right_half[:left_shift_schedule[i]]
+            left_half = left_half[left_shift_schedule[i]:] + left_half[:left_shift_schedule[i]]
+            right_half = right_half[left_shift_schedule[i]:] + right_half[:left_shift_schedule[i]]
 
             # Combine left and right halves
             combined_halves = left_half + right_half
@@ -251,10 +247,16 @@ class AIMODEL:
         if DES.sboxes is None:
             DES.sboxes = []
             for _ in range(num_sboxes):
-                sbox = np.arange(64)
+                sbox = np.arange(0, 32)  # Generate numbers from 0 to 31
                 np.random.shuffle(sbox)
+                # Ensure the array has the correct size (64 elements)
+                if len(sbox) < 64:
+                    repetitions = (64 - len(sbox)) // len(sbox) + 1
+                    sbox = np.tile(sbox, repetitions)[:64]
+                # Reshape the array to shape (4, 16)
                 sbox = np.reshape(sbox, (4, 16))
                 DES.sboxes.append(sbox)
+        print(DES.sboxes)
         return DES.sboxes
 
     @staticmethod
@@ -288,10 +290,10 @@ class AIMODEL:
     def print_table(table):
         for k, v in table.items():
             print(k, ':', v)
-    
+
     @staticmethod
-    def geneticModel(population_size):
-        problem = SboxProblem()
+    def geneticModel(num_sboxes, population_size):
+        problem = SboxProblem(num_sboxes)
         algorithm = GA(pop_size=population_size)
 
         res = minimize(problem,
@@ -304,6 +306,19 @@ class AIMODEL:
 
         return best_solution, best_score
 
+    def calculate_dlct_score(sboxes):
+        dlct_score_total = 0
+        for sbox in sboxes:
+            dlct_score_sbox = 0
+            n = len(sbox)
+            for alpha in range(n):
+                for beta in range(n):
+                    count_diff = np.sum(sbox ^ np.roll(
+                        sbox, alpha, axis=0) == beta)
+                    dlct_score_sbox += abs(count_diff - (n / 2))
+            dlct_score_total += dlct_score_sbox
+        return dlct_score_total
+
 
 class SboxProblem(Problem):
     def __init__(self, num_sboxes):
@@ -313,11 +328,16 @@ class SboxProblem(Problem):
 
     def _evaluate(self, X, out, *args, **kwargs):
         sboxes = []
-        for i in range(self.num_sboxes):
-            sbox = X[i*64:(i+1)*64].reshape(4, 16)
-            sboxes.append(sbox)
+        chunk_size = 64
+        for i in range(0, len(X), chunk_size):
+            chunk = X[i:i + chunk_size]
+            if len(chunk) != chunk_size:
+                continue  # Skip incomplete chunks
+            sboxes.append(chunk.reshape(4, 16))
         dlct_score = AIMODEL.calculate_dlct_score(sboxes)
         out["F"] = dlct_score
+
+
 def main():
     pt = "0123456789ABCDEF"
     key = "133457799BBCDFF1"
@@ -363,21 +383,29 @@ def main():
     print("Decryption")
     plain_text = Decryption.decrypt(cipher_text, rkb, rk)
     print("Plain Text : ", plain_text)
-    best_sbox = AIMODEL.geneticModel(population_size=100)
-    print("Best S-box: ", best_sbox)
-    sbox = DES.get_tables()[3][0].flatten()  
+    """
+    num_sboxes = 8
+    population_size = 100
+    best_sboxes, best_score = AIMODEL.geneticModel(num_sboxes, population_size)
+    print("Mejor S-box encontrada:")
+    print(best_sboxes.reshape(num_sboxes, 4, 16))
+    print("Puntaje DLCT de la mejor S-box:", best_score)
+
+    sbox = DES.get_tables()[3][0].flatten()
     print("Differential Table:")
     diff_table = AIMODEL.differential_table(sbox)
 
-    table_data = [(input_diff, output_diff, count) for (input_diff, output_diff), count in diff_table.items()]
+    table_data = [(input_diff, output_diff, count)
+                  for (input_diff, output_diff), count in diff_table.items()]
 
-    print(tabulate(table_data, headers=["Input Diff", "Output Diff", "Count"], tablefmt="grid"))
-    #AIMODEL.print_table(diff_table)
+    print(tabulate(table_data, headers=[
+          "Input Diff", "Output Diff", "Count"], tablefmt="grid"))
+    # AIMODEL.print_table(diff_table)
 
     print("\nLinear Table:")
     lin_table = AIMODEL.linear_table(sbox)
     AIMODEL.print_table(lin_table)
-
+    """
 
 if __name__ == "__main__":
     main()
