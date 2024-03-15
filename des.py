@@ -242,27 +242,26 @@ keyp = [
 class AIMODEL:
     def __init__(self):
         pass
-
+    @staticmethod
     def generate_sboxes(num_sboxes):
         if DES.sboxes is None:
             DES.sboxes = []
-            for _ in range(num_sboxes):
-                sbox = np.arange(0, 32)  # Generate numbers from 0 to 31
-                np.random.shuffle(sbox)
-                # Ensure the array has the correct size (64 elements)
-                if len(sbox) < 64:
-                    repetitions = (64 - len(sbox)) // len(sbox) + 1
-                    sbox = np.tile(sbox, repetitions)[:64]
-                # Reshape the array to shape (4, 16)
-                sbox = np.reshape(sbox, (4, 16))
-                DES.sboxes.append(sbox)
-        print(DES.sboxes)
+        for _ in range(num_sboxes):
+            sbox = np.arange(0, 32)  
+            np.random.shuffle(sbox)
+            if len(sbox) < 64:
+                repetitions = (64 - len(sbox)) // len(sbox) + 1
+                sbox = np.tile(sbox, repetitions)[:64]
+            sbox = np.reshape(sbox, (4, 16))
+            # Round the values to the nearest integer
+            sbox = np.round(sbox).astype(int)
+            DES.sboxes.append(sbox)
         return DES.sboxes
+   
 
     @staticmethod
     def sbox_array(input_array):
-        # Vectorized S-box function to handle NumPy arrays
-        sbox = DES.get_tables()[3][0]  # Assuming this retrieves the S-box
+        sbox = DES.get_tables()[3][0]  
         return np.vectorize(sbox)(input_array)
 
     def differential_table(sbox):
@@ -293,50 +292,64 @@ class AIMODEL:
 
     @staticmethod
     def geneticModel(num_sboxes, population_size):
-        problem = SboxProblem(num_sboxes)
+        num_variables = num_sboxes * 64
+        lower_bound = 0
+        upper_bound = 31  # Upper bound set to the maximum value in the sbox
+    
+        xl = np.full(num_variables, lower_bound)  # Array filled with lower_bound
+        xu = np.full(num_variables, upper_bound)  # Array filled with upper_bound
+        problem = SboxProblem(num_sboxes, xl=xl, xu=xu)
         algorithm = GA(pop_size=population_size)
-
-        res = minimize(problem,
-                       algorithm,
-                       seed=1,
-                       verbose=False)
-
-        best_solution = res.X
+    
+        res = minimize(problem, algorithm, seed=1, verbose=False)
+    
+        best_solution = np.round(res.X).astype(int)  # Round the solution to integers
         best_score = res.F[0]
-
+    
         return best_solution, best_score
 
+    @staticmethod
     def calculate_dlct_score(sboxes):
         dlct_score_total = 0
         for sbox in sboxes:
             dlct_score_sbox = 0
             n = len(sbox)
+            sbox = sbox.astype(int)
             for alpha in range(n):
                 for beta in range(n):
-                    count_diff = np.sum(sbox ^ np.roll(
-                        sbox, alpha, axis=0) == beta)
+                    count_diff = np.sum(np.bitwise_xor(
+                        sbox, np.roll(sbox, alpha, axis=0)) == beta)
                     dlct_score_sbox += abs(count_diff - (n / 2))
             dlct_score_total += dlct_score_sbox
         return dlct_score_total
 
 
 class SboxProblem(Problem):
-    def __init__(self, num_sboxes):
+    def __init__(self, num_sboxes, xl=None, xu=None):
         super().__init__(n_var=num_sboxes * 64, n_obj=1,
                          n_constr=0, elementwise_evaluation=True)
         self.num_sboxes = num_sboxes
+        self.xl = xl
+        self.xu = xu
 
     def _evaluate(self, X, out, *args, **kwargs):
-        sboxes = []
-        chunk_size = 64
-        for i in range(0, len(X), chunk_size):
-            chunk = X[i:i + chunk_size]
-            if len(chunk) != chunk_size:
-                continue  # Skip incomplete chunks
-            sboxes.append(chunk.reshape(4, 16))
+        sboxes = np.array_split(X, self.num_sboxes)
         dlct_score = AIMODEL.calculate_dlct_score(sboxes)
+
+        # Ensure dlct_score has shape (100, 1)
+        dlct_score = np.array([dlct_score] * 100).reshape(-1, 1)
+
         out["F"] = dlct_score
 
+    def _calc_pbounds(self, **kwargs):
+        if self.xl is not None and self.xu is not None:
+            xl = self.xl
+            xu = self.xu
+        else:
+            xl = np.zeros(self.n_var)
+            xu = np.ones(self.n_var)
+        return xl, xu
+    
 
 def main():
     pt = "0123456789ABCDEF"
@@ -383,7 +396,7 @@ def main():
     print("Decryption")
     plain_text = Decryption.decrypt(cipher_text, rkb, rk)
     print("Plain Text : ", plain_text)
-    """
+
     num_sboxes = 8
     population_size = 100
     best_sboxes, best_score = AIMODEL.geneticModel(num_sboxes, population_size)
@@ -405,7 +418,7 @@ def main():
     print("\nLinear Table:")
     lin_table = AIMODEL.linear_table(sbox)
     AIMODEL.print_table(lin_table)
-    """
+
 
 if __name__ == "__main__":
     main()

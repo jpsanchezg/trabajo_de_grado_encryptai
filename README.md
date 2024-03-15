@@ -8,7 +8,12 @@ Si ya tienes poetry instalado, puedes instalar las dependencias del proyecto con
 poetry install
 ```
 
-Para correr el proyecto puedes ejecutar el siguiente comando:
+para activar el entorno virtual de poetry puedes ejecutar el siguiente comando:
+```bash
+poetry shell
+```
+
+Para correr el proyecto puedes ejecutar el siguiente comando, antes de ejecutar el comando asegurate de tener activado el entorno virtual de poetry:
 ```bash
 poetry run python des.py
 ```
