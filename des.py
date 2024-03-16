@@ -57,8 +57,7 @@ class DES:
             34, 2, 42, 10, 50, 18, 58, 26,
             33, 1, 41, 9, 49, 17, 57, 25
         ]
-        sbox = AIMODEL.generate_sboxes(8)
-        return initial_perm, exp_d, per, sbox, final_perm
+        return initial_perm, exp_d, per, final_perm
 
     def generate_round_keys(self):
         # Permuted Choice 1 (PC1) table
@@ -170,9 +169,9 @@ class Encryption(DES):
         super().__init__(key)
 
     @staticmethod
-    def encrypt(pt, rkb, rk):
+    def encrypt(pt, rkb, rk,sbox):
         pt = DES.hex_to_bin(pt)
-        initial_perm, exp_d, per, sbox, final_perm = DES.get_tables()
+        initial_perm, exp_d, per, final_perm = DES.get_tables()
 
         # Initial Permutation
         pt = DES.permute(pt, initial_perm, 64)
@@ -221,10 +220,10 @@ class Decryption(DES):
         super().__init__(key)
 
     @staticmethod
-    def decrypt(cipher_text, rkb, rk):
+    def decrypt(cipher_text, rkb, rk,sbox):
         rkb_rev = rkb[::-1]
         rk_rev = rk[::-1]
-        text = DES.bin_to_hex(Encryption.encrypt(cipher_text, rkb_rev, rk_rev))
+        text = DES.bin_to_hex(Encryption.encrypt(cipher_text, rkb_rev, rk_rev,sbox))
         return text
 
 
@@ -352,7 +351,7 @@ class SboxProblem(Problem):
     
 
 def main():
-    pt = "0123456789ABCDEF"
+    pt = "ADC0326456789BAEF"
     key = "133457799BBCDFF1"
     print(" Before the encription Plain Text : ", pt)
 
@@ -389,13 +388,7 @@ def main():
         rkb.append(round_key)
         rk.append(DES.bin_to_hex(round_key))
 
-    print("Encryption")
-    cipher_text = DES.bin_to_hex(Encryption.encrypt(pt, rkb, rk))
-    print("Cipher Text : ", cipher_text)
-
-    print("Decryption")
-    plain_text = Decryption.decrypt(cipher_text, rkb, rk)
-    print("Plain Text : ", plain_text)
+    
 
     num_sboxes = 8
     population_size = 100
@@ -404,20 +397,31 @@ def main():
     print(best_sboxes.reshape(num_sboxes, 4, 16))
     print("Puntaje DLCT de la mejor S-box:", best_score)
 
-    sbox = DES.get_tables()[3][0].flatten()
-    print("Differential Table:")
-    diff_table = AIMODEL.differential_table(sbox)
+    print("Encryption")
+    cipher_text = DES.bin_to_hex(Encryption.encrypt(
+        pt, rkb, rk, best_sboxes.reshape(num_sboxes, 4, 16)))
+    print("Cipher Text : ", cipher_text)
 
-    table_data = [(input_diff, output_diff, count)
-                  for (input_diff, output_diff), count in diff_table.items()]
+    print("Decryption")
+    plain_text = Decryption.decrypt(cipher_text, rkb, rk, best_sboxes.reshape(num_sboxes, 4, 16))
+    print("Plain Text : ", plain_text)
 
-    print(tabulate(table_data, headers=[
-          "Input Diff", "Output Diff", "Count"], tablefmt="grid"))
-    # AIMODEL.print_table(diff_table)
 
-    print("\nLinear Table:")
-    lin_table = AIMODEL.linear_table(sbox)
-    AIMODEL.print_table(lin_table)
+
+    #sbox = DES.get_tables()[3][0].flatten()
+    #print("Differential Table:")
+    #diff_table = AIMODEL.differential_table(sbox)
+#
+    #table_data = [(input_diff, output_diff, count)
+    #              for (input_diff, output_diff), count in diff_table.items()]
+#
+    #print(tabulate(table_data, headers=[
+    #      "Input Diff", "Output Diff", "Count"], tablefmt="grid"))
+    ## AIMODEL.print_table(diff_table)
+#
+    #print("\nLinear Table:")
+    #lin_table = AIMODEL.linear_table(sbox)
+    #AIMODEL.print_table(lin_table)
 
 
 if __name__ == "__main__":
