@@ -393,7 +393,7 @@ def main():
     print("Encription Without AI")
     cipher_text = DES.bin_to_hex(Encryption.encrypt(
                 pt, rkb, rk, sboxes))
-    print("Cipher Text with AI: ", cipher_textAI)
+    print("Cipher Text with AI: ", cipher_text)
     
     print("Decryption Without AI")
     plain_text = Decryption.decrypt(cipher_text, rkb, rk,sboxes)
