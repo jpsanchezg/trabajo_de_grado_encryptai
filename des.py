@@ -388,8 +388,19 @@ def main():
         rkb.append(round_key)
         rk.append(DES.bin_to_hex(round_key))
 
+    #DES without AI
+    sboxes = AIMODEL.generate_sboxes(8)
+    print("Encription Without AI")
+    cipher_text = DES.bin_to_hex(Encryption.encrypt(
+                pt, rkb, rk, sboxes))
+    print("Cipher Text with AI: ", cipher_textAI)
     
+    print("Decryption Without AI")
+    plain_text = Decryption.decrypt(cipher_text, rkb, rk,sboxes)
+    print("Plain Text : ", plain_text)
 
+    
+    # DES with AI
     num_sboxes = 8
     population_size = 100
     best_sboxes, best_score = AIMODEL.geneticModel(num_sboxes, population_size)
@@ -397,14 +408,14 @@ def main():
     print(best_sboxes.reshape(num_sboxes, 4, 16))
     print("Puntaje DLCT de la mejor S-box:", best_score)
 
-    print("Encryption")
-    cipher_text = DES.bin_to_hex(Encryption.encrypt(
+    print("Encryption with Genetics")
+    cipher_textAI = DES.bin_to_hex(Encryption.encrypt(
         pt, rkb, rk, best_sboxes.reshape(num_sboxes, 4, 16)))
-    print("Cipher Text : ", cipher_text)
+    print("Cipher Text with AI: ", cipher_textAI)
 
-    print("Decryption")
-    plain_text = Decryption.decrypt(cipher_text, rkb, rk, best_sboxes.reshape(num_sboxes, 4, 16))
-    print("Plain Text : ", plain_text)
+    print("Decryption with Genetics")
+    plain_textAI = Decryption.decrypt(cipher_text, rkb, rk, best_sboxes.reshape(num_sboxes, 4, 16))
+    print("Plain Text : ", plain_textAI)
 
 
 
