@@ -15,5 +15,6 @@ poetry shell
 
 Para correr el proyecto puedes ejecutar el siguiente comando, antes de ejecutar el comando asegurate de tener activado el entorno virtual de poetry:
 ```bash
+cd tesis
 poetry run python des.py
 ```
