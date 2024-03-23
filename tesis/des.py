@@ -3,6 +3,7 @@ from tabulate import tabulate
 from pymoo.algorithms.soo.nonconvex.ga import GA
 from pymoo.core.problem import Problem
 from pymoo.optimize import minimize
+import secrets
 
 
 class DES:
@@ -11,15 +12,109 @@ class DES:
     sboxes = None
 
     @staticmethod
+    def generate_key(key_length=64):
+        """
+        Genera una clave para el algoritmo de encriptación DES.
+
+        Args:
+        key_length (int): La longitud de la clave en bits. Por defecto, se utiliza una longitud de 64 bits.
+
+        Returns:
+        str: La clave generada en formato hexadecimal.
+        """
+        if key_length % 8 != 0:
+            raise ValueError(
+                "La longitud de la clave debe ser un múltiplo de 8")
+
+        num_bytes = key_length // 8
+        key = secrets.token_bytes(num_bytes)
+        return key.hex()
+    
+    @staticmethod
     def hex_to_bin(s):
         mp = {'0': "0000", '1': "0001", '2': "0010", '3': "0011",
               '4': "0100", '5': "0101", '6': "0110", '7': "0111",
               '8': "1000", '9': "1001", 'A': "1010", 'B': "1011",
               'C': "1100", 'D': "1101", 'E': "1110", 'F': "1111"}
+        
         binary = ""
         for char in s:
-            binary += mp[char]
+            binary += mp[char.upper()]  # Convertir a mayúsculas antes de buscar en el diccionario
         return binary
+
+    @staticmethod
+    def get_expansion_d_box():
+        """
+        Retorna la tabla de expansión D utilizada en DES.
+
+        Returns:
+        list: La tabla de expansión D.
+        """
+        expansion_d_box = [
+            32, 1, 2, 3, 4, 5,
+            4, 5, 6, 7, 8, 9,
+            8, 9, 10, 11, 12, 13,
+            12, 13, 14, 15, 16, 17,
+            16, 17, 18, 19, 20, 21,
+            20, 21, 22, 23, 24, 25,
+            24, 25, 26, 27, 28, 29,
+            28, 29, 30, 31, 32, 1
+        ]
+        return expansion_d_box
+    @staticmethod
+    def get_initial_permutation_table():
+        """
+        Retorna la tabla de permutación inicial utilizada en DES.
+
+        Returns:
+        list: La tabla de permutación inicial.
+        """
+        initial_permutation_table = [
+            58, 50, 42, 34, 26, 18, 10, 2,
+            60, 52, 44, 36, 28, 20, 12, 4,
+            62, 54, 46, 38, 30, 22, 14, 6,
+            64, 56, 48, 40, 32, 24, 16, 8,
+            57, 49, 41, 33, 25, 17, 9, 1,
+            59, 51, 43, 35, 27, 19, 11, 3,
+            61, 53, 45, 37, 29, 21, 13, 5,
+            63, 55, 47, 39, 31, 23, 15, 7
+        ]
+        return initial_permutation_table
+
+    @staticmethod
+    def get_final_permutation_table():
+        """
+        Retorna la tabla de permutación final utilizada en DES.
+
+        Returns:
+        list: La tabla de permutación final.
+        """
+        final_permutation_table = [
+            40, 8, 48, 16, 56, 24, 64, 32,
+            39, 7, 47, 15, 55, 23, 63, 31,
+            38, 6, 46, 14, 54, 22, 62, 30,
+            37, 5, 45, 13, 53, 21, 61, 29,
+            36, 4, 44, 12, 52, 20, 60, 28,
+            35, 3, 43, 11, 51, 19, 59, 27,
+            34, 2, 42, 10, 50, 18, 58, 26,
+            33, 1, 41, 9, 49, 17, 57, 25
+        ]
+        return final_permutation_table
+    @staticmethod
+    def get_permutation_box():
+        """
+        Retorna la tabla de permutación utilizada en la etapa de sustitución (S-box) en DES.
+
+        Returns:
+        list: La tabla de permutación para la etapa de sustitución.
+        """
+        permutation_box = [
+            16, 7, 20, 21, 29, 12, 28, 17,
+            1, 15, 23, 26, 5, 18, 31, 10,
+            2, 8, 24, 14, 32, 27, 3, 9,
+            19, 13, 30, 6, 22, 11, 4, 25
+        ]
+        return permutation_box
 
     def get_tables():
         initial_perm = [58, 50, 42, 34, 26, 18, 10, 2,
@@ -119,17 +214,18 @@ class DES:
 
     @staticmethod
     def bin_to_hex(s):
-
         mp = {
             "0000": '0', "0001": '1', "0010": '2', "0011": '3',
             "0100": '4', "0101": '5', "0110": '6', "0111": '7',
             "1000": '8', "1001": '9', "1010": 'A', "1011": 'B',
             "1100": 'C', "1101": 'D', "1110": 'E', "1111": 'F'
         }
+
         hex_str = ""
+        # Divide la cadena binaria en segmentos de 4 bits y los convierte a hexadecimal
         for i in range(0, len(s), 4):
-            ch = s[i:i + 4]
-            hex_str += mp[ch]
+            bin_chunk = s[i:i+4]
+            hex_str += mp[bin_chunk]
         return hex_str
 
     @staticmethod
@@ -168,50 +264,46 @@ class Encryption(DES):
     def __init__(self, key):
         super().__init__(key)
 
-    @staticmethod
-    def encrypt(pt, rkb, rk,sbox):
-        pt = DES.hex_to_bin(pt)
-        initial_perm, exp_d, per, final_perm = DES.get_tables()
+    def encrypt(pt, rkb, rk, sbox):
+        # Convert plaintext to binary
+        pt_bin = DES.hex_to_bin(pt)
 
         # Initial Permutation
-        pt = DES.permute(pt, initial_perm, 64)
-        print("After initial permutation", DES.bin_to_hex(pt))
+        pt_permuted = DES.permute(pt_bin, DES.get_initial_permutation_table(), 64)
+        print("After initial permutation:", DES.bin_to_hex(pt_permuted))
 
-        # Splitting
-        left = pt[0:32]
-        right = pt[32:64]
-        for i in range(0, 16):
-            # Expansion D-box: Expanding the 32 bits data into 48 bits
-            right_expanded = DES.permute(right, exp_d, 48)
+        # Split the permuted plaintext into left and right halves
+        left, right = pt_permuted[:32], pt_permuted[32:]
 
-            # XOR RoundKey[i] and right_expanded
-            xor_x = DES.xor(right_expanded, rkb[i])
+        # Encryption rounds
+        for i in range(16):
+            # Expansion D-box
+            right_expanded = DES.permute(right, DES.get_expansion_d_box(), 48)
 
-            # S-boxex: substituting the value from s-box table by calculating row and column
+            # XOR with round key
+            xor_result = DES.xor(right_expanded, rkb[i])
+
+            # S-box substitution
             sbox_str = ""
-            for j in range(0, 8):
-                row = DES.bin_to_dec(int(xor_x[j * 6] + xor_x[j * 6 + 5]))
-                col = DES.bin_to_dec(
-                    int(xor_x[j * 6 + 1] + xor_x[j * 6 + 2] + xor_x[j * 6 + 3] + xor_x[j * 6 + 4]))
+            for j in range(8):
+                row = DES.bin_to_dec(int(xor_result[j * 6] + xor_result[j * 6 + 5]))
+                col = DES.bin_to_dec(int(xor_result[j * 6 + 1:j * 6 + 5]))
                 val = sbox[j][row][col]
-                sbox_str = sbox_str + DES.dec_to_bin(val)
+                sbox_str += DES.dec_to_bin(val)
 
-            # Straight D-box: After substituting rearranging the bits
-            sbox_str = DES.permute(sbox_str, per, 32)
+            # Straight D-box
+            straight_permuted = DES.permute(sbox_str, DES.get_permutation_box(), 32)
 
-            # XOR left and sbox_str
-            result = DES.xor(left, sbox_str)
-            left = result
-
-            # Swapper
-            if i != 15:
-                left, right = right, left
+            # XOR with left
+            result = DES.xor(left, straight_permuted)
+            left = right
+            right = result
 
         # Combination
-        combine = left + right
+        combined = right + left
 
-        # Final permutation: final rearranging of bits to get cipher text
-        cipher_text = DES.permute(combine, final_perm, 64)
+        # Final permutation
+        cipher_text = DES.permute(combined, DES.get_final_permutation_table(), 64)
         return cipher_text
 
 
@@ -256,12 +348,7 @@ class AIMODEL:
             sbox = np.round(sbox).astype(int)
             DES.sboxes.append(sbox)
         return DES.sboxes
-   
 
-    @staticmethod
-    def sbox_array(input_array):
-        sbox = DES.get_tables()[3][0]  
-        return np.vectorize(sbox)(input_array)
 
     def differential_table(sbox):
         table = {}
@@ -352,12 +439,18 @@ class SboxProblem(Problem):
 
 def main():
     pt = "ADC0326456789BAEF"
-    key = "133457799BBCDFF1"
     print(" Before the encription Plain Text : ", pt)
 
-    # Key generation
-    key = DES.hex_to_bin(key)
-    key = DES.permute(key, keyp, 56)
+
+    # Key generation for DES algorithm without AI
+    key_without_AI = DES.generate_key()
+    key_without_AI = DES.hex_to_bin(key_without_AI)
+    key_without_AI = DES.permute(key_without_AI, keyp, 56)
+
+    # Key generation for DES algorithm with AI
+    key_with_AI = DES.generate_key()
+    key_with_AI = DES.hex_to_bin(key_with_AI)
+    key_with_AI = DES.permute(key_with_AI, keyp, 56)
 
     shift_table = [1, 1, 2, 2,
                    2, 2, 2, 2,
@@ -373,11 +466,19 @@ def main():
                 44, 49, 39, 56, 34, 53,
                 46, 42, 50, 36, 29, 32]
 
-    left = key[0:28]
-    right = key[28:56]
+    left = key_without_AI[0:28]
+    right = key_without_AI[28:56]
 
-    rkb = []
-    rk = []
+    rkb_without_AI = []
+    rk_without_AI = []
+
+    left_with_AI = key_with_AI[0:28]
+    right_with_AI = key_with_AI[28:56]
+
+    rkb_with_AI = []
+    rk_with_AI = []
+
+    # Generate round keys for DES without AI
     for i in range(0, 16):
         left = DES.shift_left(left, shift_table[i])
         right = DES.shift_left(right, shift_table[i])
@@ -385,38 +486,49 @@ def main():
         combine_str = left + right
         round_key = DES.permute(combine_str, key_comp, 48)
 
-        rkb.append(round_key)
-        rk.append(DES.bin_to_hex(round_key))
+        rkb_without_AI.append(round_key)
+        rk_without_AI.append(DES.bin_to_hex(round_key))
 
-    #DES without AI
+    # Generate round keys for DES with AI
+    for i in range(0, 16):
+        left_with_AI = DES.shift_left(left_with_AI, shift_table[i])
+        right_with_AI = DES.shift_left(right_with_AI, shift_table[i])
+
+        combine_str_with_AI = left_with_AI + right_with_AI
+        round_key_with_AI = DES.permute(combine_str_with_AI, key_comp, 48)
+
+        rkb_with_AI.append(round_key_with_AI)
+        rk_with_AI.append(DES.bin_to_hex(round_key_with_AI))
+
+    # DES without AI
     sboxes = AIMODEL.generate_sboxes(8)
-    print("Encription Without AI")
-    cipher_text = DES.bin_to_hex(Encryption.encrypt(
-                pt, rkb, rk, sboxes))
-    print("Cipher Text with AI: ", cipher_text)
-    
-    print("Decryption Without AI")
-    plain_text = Decryption.decrypt(cipher_text, rkb, rk,sboxes)
-    print("Plain Text : ", plain_text)
+    print("Encryption without AI")
+    cipher_text_without_AI = DES.bin_to_hex(
+        Encryption.encrypt(pt, rkb_without_AI, rk_without_AI, sboxes))
+    print("Cipher Text without AI: ", cipher_text_without_AI)
 
-    
+    print("Decryption without AI")
+    plain_text_without_AI = Decryption.decrypt(
+        cipher_text_without_AI, rkb_without_AI, rk_without_AI, sboxes)
+    print("Plain Text without AI: ", plain_text_without_AI)
+
     # DES with AI
     num_sboxes = 8
     population_size = 100
     best_sboxes, best_score = AIMODEL.geneticModel(num_sboxes, population_size)
-    print("Mejor S-box encontrada:")
+    print("Best S-box found:")
     print(best_sboxes.reshape(num_sboxes, 4, 16))
-    print("Puntaje DLCT de la mejor S-box:", best_score)
+    print("DLCT score of the best S-box:", best_score)
 
-    print("Encryption with Genetics")
-    cipher_textAI = DES.bin_to_hex(Encryption.encrypt(
-        pt, rkb, rk, best_sboxes.reshape(num_sboxes, 4, 16)))
-    print("Cipher Text with AI: ", cipher_textAI)
+    print("Encryption with AI")
+    cipher_text_with_AI = DES.bin_to_hex(Encryption.encrypt(
+        pt, rkb_with_AI, rk_with_AI, best_sboxes.reshape(num_sboxes, 4, 16)))
+    print("Cipher Text with AI: ", cipher_text_with_AI)
 
-    print("Decryption with Genetics")
-    plain_textAI = Decryption.decrypt(cipher_text, rkb, rk, best_sboxes.reshape(num_sboxes, 4, 16))
-    print("Plain Text : ", plain_textAI)
-
+    print("Decryption with AI")
+    plain_text_with_AI = Decryption.decrypt(
+        cipher_text_with_AI, rkb_with_AI, rk_with_AI, best_sboxes.reshape(num_sboxes, 4, 16))
+    print("Decrypt result text with AI: ", plain_text_with_AI)
 
 
     #sbox = DES.get_tables()[3][0].flatten()
