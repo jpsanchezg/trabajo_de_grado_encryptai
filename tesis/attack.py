@@ -21,20 +21,21 @@ def generate_plaintext_pairs(num_pairs):
         plaintext_pairs.append((plaintext1, plaintext2))
     return plaintext_pairs
 
-def encrypt_with_des(plaintext, round_keys, sboxes):
+def encrypt_with_des(plaintext, round_keys, sbox):
     """
-    Cifra un texto claro utilizando el algoritmo de cifrado DES con las S-boxes especificadas.
+    Cifra un texto claro utilizando el algoritmo de cifrado DES con la S-box especificada.
 
     Args:
     - plaintext: Texto claro a cifrar.
     - round_keys: Claves de ronda generadas por DES.
-    - sboxes: S-boxes utilizadas en el cifrado DES.
+    - sbox: S-box utilizada en el cifrado DES.
 
     Returns:
     - Cifrado del texto claro.
     """
-    # Cifra el texto claro utilizando el algoritmo DES
-    ciphertext = Encryption.encrypt(plaintext, round_keys, sboxes)
+    des_instance = DES("")  # Initialize DES instance with an empty key
+    des_instance.sboxes = sbox  # Set the custom S-box
+    ciphertext = Encryption.encrypt(plaintext, round_keys, [], sbox)  # Encrypt using the provided S-box
     return ciphertext
 
 def differential_attack_on_aimodel(plaintext_pairs, round_keys_original):
@@ -56,21 +57,20 @@ def differential_attack_on_aimodel(plaintext_pairs, round_keys_original):
     num_sboxes = 8
     population_size = 100
     best_sboxes, _ = AIMODEL.geneticModel(num_sboxes, population_size)
-    # Convierte las S-boxes en un formato compatible con DES
-    sboxes = best_sboxes.reshape(num_sboxes, 4, 16)
     # Realiza el ataque diferencial
     for plaintext1, plaintext2 in plaintext_pairs:
-        # Cifra los textos claros utilizando las S-boxes originales de DES y las S-boxes generadas por AIMODEL
-        ciphertext_original = encrypt_with_des(plaintext1, round_keys_original, sboxes)
-        ciphertext_aimodel = encrypt_with_des(plaintext2, round_keys_original, sboxes)
+        # Cifra los textos claros utilizando las S-boxes generadas por AIMODEL
+        ciphertext1 = encrypt_with_des(plaintext1, round_keys_original, best_sboxes)
+        ciphertext2 = encrypt_with_des(plaintext2, round_keys_original, best_sboxes)
         # Verifica si los cifrados son iguales, lo que indica un posible éxito del ataque
-        if ciphertext_original == ciphertext_aimodel:
+        if ciphertext1 == ciphertext2:
             successful_attacks += 1  # Incrementa el contador de ataques exitosos
     end_time = time.time()  # Registra el tiempo de finalización del ataque
     execution_time = end_time - start_time  # Calcula el tiempo total de ejecución del ataque
-    # Calcula la tasa de éxito del ataque (porcentaje de ataques exitosos)
+    # Calcula la tasa de éxito delataque (porcentaje de ataques exitosos)
     success_rate = successful_attacks / num_pairs
     return success_rate, execution_time
+
 
 def calculate_dlct_score(sboxes):
     """
@@ -111,7 +111,7 @@ def main():
         29, 21, 13, 5, 28, 20, 12, 4
     ]
     des_instance = DES(key)  # Crea una instancia de la clase DES
-    round_keys_original = des_instance.generate_round_keys(des_instance.permute(key, keyp, 56))  # Genera claves de ronda
+    round_keys_original = des_instance.generate_round_keys()  # Genera claves de ronda
     # Realiza el ataque diferencial utilizando las S-boxes generadas por AIMODEL
     success_rate, execution_time = differential_attack_on_aimodel(plaintext_pairs, round_keys_original)
     print("Tasa de éxito del ataque diferencial:", success_rate)
