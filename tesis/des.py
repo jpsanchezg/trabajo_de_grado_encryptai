@@ -258,7 +258,37 @@ class DES:
     @staticmethod
     def xor(a, b):
         return ''.join('0' if x == y else '1' for x, y in zip(a, b))
-    
+
+    @staticmethod
+    def generate_round_keys(shift_table, key_comp, left, right, left_with_AI, right_with_AI):
+        rkb_without_AI = []
+        rk_without_AI = []
+        rkb_with_AI = []
+        rk_with_AI = []
+
+        # Generate round keys for DES without AI
+        for i in range(0, 16):
+            left = DES.shift_left(left, shift_table[i])
+            right = DES.shift_left(right, shift_table[i])
+
+            combine_str = left + right
+            round_key = DES.permute(combine_str, key_comp, 48)
+
+            rkb_without_AI.append(round_key)
+            rk_without_AI.append(DES.bin_to_hex(round_key))
+
+        # Generate round keys for DES with AI
+        for i in range(0, 16):
+            left_with_AI = DES.shift_left(left_with_AI, shift_table[i])
+            right_with_AI = DES.shift_left(right_with_AI, shift_table[i])
+
+            combine_str_with_AI = left_with_AI + right_with_AI
+            round_key_with_AI = DES.permute(combine_str_with_AI, key_comp, 48)
+
+            rkb_with_AI.append(round_key_with_AI)
+            rk_with_AI.append(DES.bin_to_hex(round_key_with_AI))
+
+        return rkb_without_AI, rk_without_AI, rkb_with_AI, rk_with_AI
 
 
 class Encryption(DES):
@@ -271,7 +301,6 @@ class Encryption(DES):
 
         # Initial Permutation
         pt_permuted = DES.permute(pt_bin, DES.get_initial_permutation_table(), 64)
-        print("After initial permutation:", DES.bin_to_hex(pt_permuted))
 
         # Split the permuted plaintext into left and right halves
         left, right = pt_permuted[:32], pt_permuted[32:]
@@ -402,11 +431,12 @@ class AIMODEL:
             dlct_score_sbox = 0
             n = len(sbox)
             sbox = sbox.astype(int)
+            if sbox.ndim != 2:
+                raise ValueError("S-boxes must be 2-dimensional arrays.")
             for alpha in range(n):
-                for beta in range(n):
-                    count_diff = np.sum(np.bitwise_xor(
-                        sbox, np.roll(sbox, alpha, axis=0)) == beta)
-                    dlct_score_sbox += abs(count_diff - (n / 2))
+                count_diff = np.sum(np.bitwise_xor(
+                    sbox, np.roll(sbox, alpha, axis=0))[:, :, np.newaxis] == np.arange(n))
+                dlct_score_sbox += np.abs(count_diff - (n / 2)).sum()
             dlct_score_total += dlct_score_sbox
         return dlct_score_total
 
@@ -445,7 +475,10 @@ def main():
 
     # Key generation for DES algorithm without AI
     key_without_AI = DES.generate_key()
+    
     key_without_AI = DES.hex_to_bin(key_without_AI)
+    print("Key without AI:", len(key_without_AI))
+    print("Key without AI:", len(keyp))
     key_without_AI = DES.permute(key_without_AI, keyp, 56)
 
     # Key generation for DES algorithm with AI
@@ -479,27 +512,8 @@ def main():
     rkb_with_AI = []
     rk_with_AI = []
 
-    # Generate round keys for DES without AI
-    for i in range(0, 16):
-        left = DES.shift_left(left, shift_table[i])
-        right = DES.shift_left(right, shift_table[i])
-
-        combine_str = left + right
-        round_key = DES.permute(combine_str, key_comp, 48)
-
-        rkb_without_AI.append(round_key)
-        rk_without_AI.append(DES.bin_to_hex(round_key))
-
-    # Generate round keys for DES with AI
-    for i in range(0, 16):
-        left_with_AI = DES.shift_left(left_with_AI, shift_table[i])
-        right_with_AI = DES.shift_left(right_with_AI, shift_table[i])
-
-        combine_str_with_AI = left_with_AI + right_with_AI
-        round_key_with_AI = DES.permute(combine_str_with_AI, key_comp, 48)
-
-        rkb_with_AI.append(round_key_with_AI)
-        rk_with_AI.append(DES.bin_to_hex(round_key_with_AI))
+    rkb_without_AI, rk_without_AI, rkb_with_AI, rk_with_AI = DES.generate_round_keys(
+        shift_table, key_comp, left, right, left_with_AI, right_with_AI)
 
     # DES without AI
     sboxes = AIMODEL.generate_sboxes(8)
