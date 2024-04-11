@@ -1,133 +1,190 @@
 import time
+import matplotlib.pyplot as plt
 import numpy as np
-from des import DES, Encryption, AIMODEL
+from des import DES, Encryption, Decryption, AIMODEL
 
-def generate_plaintext_pairs(num_pairs):
-    """
-    Genera pares de textos claros aleatorios de 16 bits.
+def measure_time(func, *args):
+    start_time = time.time()
+    result = func(*args)
+    end_time = time.time()
+    execution_time = end_time - start_time
+    return result, execution_time
 
-    Args:
-    - num_pairs: Número de pares de textos claros a generar.
+def compare_des_performance(pt, key_without_AI, key_with_AI, rkb_without_AI, rk_without_AI, rkb_with_AI, rk_with_AI, sboxes_with_AI):
+    # Measure time for encryption and decryption without AI
+    cipher_text_without_AI, enc_time_without_AI = measure_time(Encryption.encrypt, pt, rkb_without_AI, rk_without_AI, DES.sboxes)
+    plain_text_without_AI, dec_time_without_AI = measure_time(Decryption.decrypt, cipher_text_without_AI, rkb_without_AI, rk_without_AI, DES.sboxes)
+    
+    # Measure time for encryption and decryption with AI
+    cipher_text_with_AI, enc_time_with_AI = measure_time(Encryption.encrypt, pt, rkb_with_AI, rk_with_AI, sboxes_with_AI)
+    plain_text_with_AI, dec_time_with_AI = measure_time(Decryption.decrypt, cipher_text_with_AI, rkb_with_AI, rk_with_AI, sboxes_with_AI)
+    
+    # Display metrics
+    print("Encryption Time without AI:", enc_time_without_AI)
+    print("Decryption Time without AI:", dec_time_without_AI)
+    print("Encryption Time with AI:", enc_time_with_AI)
+    print("Decryption Time with AI:", dec_time_with_AI)
+    
+    # Plot results
+    labels = ['Encryption without AI', 'Decryption without AI', 'Encryption with AI', 'Decryption with AI']
+    times = [enc_time_without_AI, dec_time_without_AI, enc_time_with_AI, dec_time_with_AI]
 
-    Returns:
-    - Lista de pares de textos claros.
-    """
-    plaintext_pairs = []
-    for _ in range(num_pairs):
-        # Genera dos textos claros aleatorios de 16 bits
-        plaintext1 = ''.join([np.random.choice(['0', '1']) for _ in range(16)])
-        plaintext2 = ''.join([np.random.choice(['0', '1']) for _ in range(16)])
-        # Agrega el par de textos claros a la lista
-        plaintext_pairs.append((plaintext1, plaintext2))
-    return plaintext_pairs
+    plt.bar(labels, times)
+    plt.ylabel('Time (seconds)')
+    plt.title('Comparison of DES Performance')
+    plt.show()
 
-def encrypt_with_des(plaintext, round_keys, sbox):
-    """
-    Cifra un texto claro utilizando el algoritmo de cifrado DES con la S-box especificada.
+def brute_force_des(pt, cipher_text, sboxes, SHIFT_TABLE, KEY_COMP):
+    for possible_key in range(2**48):  # Probamos todas las claves posibles
+        possible_key_str = format(possible_key, '048b')  # Convertimos la clave en binario
+        key = DES.bin_to_hex(possible_key_str)  # Convertimos la clave a formato hexadecimal
 
-    Args:
-    - plaintext: Texto claro a cifrar.
-    - round_keys: Claves de ronda generadas por DES.
-    - sbox: S-box utilizada en el cifrado DES.
+        # Generamos las rondas de claves
+        rkb = []
+        rk = []
+        left = possible_key_str[:28]
+        right = possible_key_str[28:56]
+        for i in range(0, 16):
+            left = DES.shift_left(left, SHIFT_TABLE[i])
+            right = DES.shift_left(right, SHIFT_TABLE[i])
 
-    Returns:
-    - Cifrado del texto claro.
-    """
-    des_instance = DES("")  # Initialize DES instance with an empty key
-    des_instance.sboxes = sbox  # Set the custom S-box
-    ciphertext = Encryption.encrypt(plaintext, round_keys, [], sbox)  # Encrypt using the provided S-box
-    return ciphertext
+            combine_str = left + right
+            round_key = DES.permute(combine_str, KEY_COMP, 48)
 
-def differential_attack_on_aimodel(plaintext_pairs, round_keys_original):
-    """
-    Realiza un ataque diferencial utilizando las S-boxes generadas por AIMODEL.
+            rkb.append(round_key)
+            rk.append(DES.bin_to_hex(round_key))
 
-    Args:
-    - plaintext_pairs: Pares de textos claros.
-    - round_keys_original: Claves de ronda generadas por DES.
+        # Probamos la clave generada
+        decrypted_text = Decryption.decrypt(cipher_text, rkb, rk, sboxes)
+        if decrypted_text == pt:
+            return key  # Si el texto descifrado coincide con el texto plano, hemos encontrado la clave
+    return None  # Si no se encuentra ninguna clave, retornamos None
 
-    Returns:
-    - Tasa de éxito del ataque.
-    - Tiempo de ejecución del ataque.
-    """
-    start_time = time.time()  # Registra el tiempo de inicio del ataque
-    successful_attacks = 0  # Contador de ataques exitosos
-    num_pairs = len(plaintext_pairs)  # Número total de pares de textos claros
-    # Genera las mejores S-boxes utilizando AIMODEL
+def brute_force_des_with_ai(pt, cipher_text, best_sboxes, SHIFT_TABLE, KEY_COMP):
+    for possible_key in range(2**48):  # Probamos todas las claves posibles
+        possible_key_str = format(possible_key, '048b')  # Convertimos la clave en binario
+        key = DES.bin_to_hex(possible_key_str)  # Convertimos la clave a formato hexadecimal
+
+        # Generamos las rondas de claves
+        rkb = []
+        rk = []
+        left = possible_key_str[:28]
+        right = possible_key_str[28:56]
+        for i in range(0, 16):
+            left = DES.shift_left(left, SHIFT_TABLE[i])
+            right = DES.shift_left(right, SHIFT_TABLE[i])
+
+            combine_str = left + right
+            round_key = DES.permute(combine_str, KEY_COMP, 48)
+
+            rkb.append(round_key)
+            rk.append(DES.bin_to_hex(round_key))
+
+        # Probamos la clave generada
+        decrypted_text = Decryption.decrypt(cipher_text, rkb, rk, best_sboxes)
+        if decrypted_text == pt:
+            return key  # Si el texto descifrado coincide con el texto plano, hemos encontrado la clave
+    return None  # Si no se encuentra ninguna clave, retornamos None
+
+
+def main():
+    pt = "ADC0326456789BAEF"
+    print(" Before the encryption Plain Text : ", pt)
+
+    # Generate S-boxes
+    sboxes_with_AI = AIMODEL.generate_sboxes(8)
+
+    keyp = [
+    57, 49, 41, 33, 25, 17, 9, 1,
+    58, 50, 42, 34, 26, 18, 10, 2,
+    59, 51, 43, 35, 27, 19, 11, 3,
+    60, 52, 44, 36, 63, 55, 47, 39,
+    31, 23, 15, 7, 62, 54, 46, 38,
+    30, 22, 14, 6, 61, 53, 45, 37,
+    29, 21, 13, 5, 28, 20, 12, 4
+    ]
+
+    # Key generation for DES algorithm without AI
+    key_without_AI = DES.generate_key()
+    key_without_AI = DES.hex_to_bin(key_without_AI)
+    key_without_AI = DES.permute(key_without_AI, keyp, 56)
+
+    # Key generation for DES algorithm with AI
+    key_with_AI = DES.generate_key()
+    key_with_AI = DES.hex_to_bin(key_with_AI)
+    key_with_AI = DES.permute(key_with_AI, keyp, 56)
+
+    shift_table = [1, 1, 2, 2,
+                   2, 2, 2, 2,
+                   1, 2, 2, 2,
+                   2, 2, 2, 1]
+
+    key_comp = [14, 17, 11, 24, 1, 5,
+                3, 28, 15, 6, 21, 10,
+                23, 19, 12, 4, 26, 8,
+                16, 7, 27, 20, 13, 2,
+                41, 52, 31, 37, 47, 55,
+                30, 40, 51, 45, 33, 48,
+                44, 49, 39, 56, 34, 53,
+                46, 42, 50, 36, 29, 32]
+
+    left = key_without_AI[0:28]
+    right = key_without_AI[28:56]
+
+    rkb_without_AI = []
+    rk_without_AI = []
+
+    left_with_AI = key_with_AI[0:28]
+    right_with_AI = key_with_AI[28:56]
+
+    rkb_with_AI = []
+    rk_with_AI = []
+
+    # Generate round keys for DES without AI
+    for i in range(0, 16):
+        left = DES.shift_left(left, shift_table[i])
+        right = DES.shift_left(right, shift_table[i])
+
+        combine_str = left + right
+        round_key = DES.permute(combine_str, key_comp, 48)
+
+        rkb_without_AI.append(round_key)
+        rk_without_AI.append(DES.bin_to_hex(round_key))
+
+    # Generate round keys for DES with AI
+    for i in range(0, 16):
+        left_with_AI = DES.shift_left(left_with_AI, shift_table[i])
+        right_with_AI = DES.shift_left(right_with_AI, shift_table[i])
+
+        combine_str_with_AI = left_with_AI + right_with_AI
+        round_key_with_AI = DES.permute(combine_str_with_AI, key_comp, 48)
+
+        rkb_with_AI.append(round_key_with_AI)
+        rk_with_AI.append(DES.bin_to_hex(round_key_with_AI))
+
+    # DES with AI
     num_sboxes = 8
     population_size = 100
     best_sboxes, _ = AIMODEL.geneticModel(num_sboxes, population_size)
-    # Realiza el ataque diferencial
-    for plaintext1, plaintext2 in plaintext_pairs:
-        # Cifra los textos claros utilizando las S-boxes generadas por AIMODEL
-        ciphertext1 = encrypt_with_des(plaintext1, round_keys_original, best_sboxes)
-        ciphertext2 = encrypt_with_des(plaintext2, round_keys_original, best_sboxes)
-        # Verifica si los cifrados son iguales, lo que indica un posible éxito del ataque
-        if ciphertext1 == ciphertext2:
-            successful_attacks += 1  # Incrementa el contador de ataques exitosos
-    end_time = time.time()  # Registra el tiempo de finalización del ataque
-    execution_time = end_time - start_time  # Calcula el tiempo total de ejecución del ataque
-    # Calcula la tasa de éxito delataque (porcentaje de ataques exitosos)
-    success_rate = successful_attacks / num_pairs
-    return success_rate, execution_time
+    sboxes_with_AI = best_sboxes.reshape(num_sboxes, 4, 16)
 
+    # Compare DES performance
+    compare_des_performance(pt, key_without_AI, key_with_AI, rkb_without_AI, rk_without_AI, rkb_with_AI, rk_with_AI, sboxes_with_AI)
 
-def calculate_dlct_score(sboxes):
-    """
-    Calcula el puntaje DLCT (Differential Linearity and Correlation Table) de las S-boxes.
+    # Cifrado del texto plano con DES sin IA
+    cipher_text_without_AI = Encryption.encrypt(pt, rkb_without_AI, rk_without_AI, DES.sboxes)
 
-    Args:
-    - sboxes: S-boxes para las cuales se calculará el puntaje DLCT.
+    # Cifrado del texto plano con DES con IA
+    cipher_text_with_AI = Encryption.encrypt(pt, rkb_with_AI, rk_with_AI, sboxes_with_AI)
 
-    Returns:
-    - Puntaje DLCT total de las S-boxes.
-    """
-    dlct_score_total = 0
-    for sbox in sboxes:
-        dlct_score_sbox = 0
-        n = len(sbox)
-        sbox = sbox.astype(int)
-        for alpha in range(n):
-            for beta in range(n):
-                count_diff = np.sum(np.bitwise_xor(
-                    sbox, np.roll(sbox, alpha, axis=0)) == beta)
-                dlct_score_sbox += abs(count_diff - (n / 2))
-        dlct_score_total += dlct_score_sbox
-    return dlct_score_total
+    # Ataque de fuerza bruta al DES tradicional
+    key_found = brute_force_des(pt, cipher_text_without_AI, DES.sboxes, shift_table, key_comp)
+    print("Key found by brute force DES traditional:", key_found)
 
-def main():
-    num_pairs = 100
-    plaintext_pairs = generate_plaintext_pairs(num_pairs)  # Genera pares de textos claros aleatorios
-    print("Ataque diferencial al cifrado DES con AIMODEL:")
-    key = "133457799BBCDFF1"  # Clave utilizada en el cifrado DES
-    key = DES.hex_to_bin(key)
-    keyp = [
-        57, 49, 41, 33, 25, 17, 9, 1,
-        58, 50, 42, 34, 26, 18, 10, 2,
-        59, 51, 43, 35, 27, 19, 11, 3,
-        60, 52, 44, 36, 63, 55, 47, 39,
-        31, 23, 15, 7, 62, 54, 46, 38,
-        30, 22, 14, 6, 61, 53, 45, 37,
-        29, 21, 13, 5, 28, 20, 12, 4
-    ]
-    des_instance = DES(key)  # Crea una instancia de la clase DES
-    round_keys_original = des_instance.generate_round_keys()  # Genera claves de ronda
-    # Realiza el ataque diferencial utilizando las S-boxes generadas por AIMODEL
-    success_rate, execution_time = differential_attack_on_aimodel(plaintext_pairs, round_keys_original)
-    print("Tasa de éxito del ataque diferencial:", success_rate)
-    print("Tiempo de ejecución del ataque diferencial:", execution_time, "segundos")
+    # Ataque de fuerza bruta al DES con IA
+    key_found_with_ai = brute_force_des_with_ai(pt, cipher_text_with_AI, sboxes_with_AI, shift_table, key_comp)
+    print("Key found by brute force DES with AI:", key_found_with_ai)
 
-    # Calcula el puntaje DLCT de las S-boxes originales de DES
-    sboxes_original = DES.get_tables()[3]  # Obtiene las S-boxes originales de DES
-    dlct_score_original = calculate_dlct_score(sboxes_original)  # Calcula el puntaje DLCT
-    print("Puntaje DLCT de las S-boxes originales de DES:", dlct_score_original)
-
-    # Calcula el puntaje DLCT de las S-boxes generadas por AIMODEL
-    num_sboxes = 8
-    population_size = 100
-    best_sboxes, _ = AIMODEL.geneticModel(num_sboxes, population_size)  # Genera las mejores S-boxes con AIMODEL
-    dlct_score_aimodel = calculate_dlct_score(best_sboxes.reshape(num_sboxes, 4, 16))  # Calcula el puntaje DLCT
-    print("Puntaje DLCT de las S-boxes generadas por AIMODEL:", dlct_score_aimodel)
 
 if __name__ == "__main__":
     main()
