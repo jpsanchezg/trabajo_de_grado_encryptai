@@ -1,7 +1,8 @@
 import time
 import matplotlib.pyplot as plt
 from des import DES, Encryption, Decryption, AIMODEL
-import multiprocessing
+from functools import partial
+import concurrent.futures
 
 
 def measure_time(func, *args):
@@ -14,22 +15,14 @@ def measure_time(func, *args):
 
 def compare_des_performance(pt, key_without_AI, key_with_AI, rkb_without_AI, rk_without_AI, rkb_with_AI, rk_with_AI, sboxes_with_AI, sboxes_without_AI):
     # Measure time for encryption and decryption without AI
-    pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
-    results_without_AI = pool.starmap(measure_time, [
-        (Encryption.encrypt, pt, rkb_without_AI, rk_without_AI, sboxes_without_AI),
-        (Decryption.decrypt, pt, rkb_without_AI,
-         rk_without_AI, sboxes_without_AI)
-    ])
-    pool.close()
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        results_without_AI = list(executor.map(partial(measure_time, Encryption.encrypt), [
+                                  pt]*2, [rkb_without_AI]*2, [rk_without_AI]*2, [sboxes_without_AI]*2))
 
     # Measure time for encryption and decryption with AI
-    pool = multiprocessing.Pool(processes=multiprocessing.cpu_count())
-    results_with_AI = pool.starmap(measure_time, [
-        (Encryption.encrypt, pt, rkb_with_AI, rk_with_AI, sboxes_with_AI),
-        (Decryption.decrypt, pt, rkb_with_AI,
-         rk_with_AI, sboxes_with_AI)
-    ])
-    pool.close()
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        results_with_AI = list(executor.map(partial(measure_time, Encryption.encrypt), [
+                               pt]*2, [rkb_with_AI]*2, [rk_with_AI]*2, [sboxes_with_AI]*2))
 
     # Display metrics
     labels = ['Encryption without AI', 'Decryption without AI',
@@ -46,9 +39,8 @@ def compare_des_performance(pt, key_without_AI, key_with_AI, rkb_without_AI, rk_
     plt.show()
 
 
-def brute_force_attack(args):
-    cipher_text, shift_table, keyp, key_comp, sboxes, original_plain_text, start, end = args
-    print("Atacando desde", start, "hasta", end)
+def brute_force_attack(cipher_text, shift_table, keyp, key_comp, sboxes, original_plain_text, start, end):
+    print(f"Procesando claves desde {start} hasta {end}...")
     for possible_key in range(start, end):
         key_binary = format(possible_key, '064b')
         key_permuted = DES.permute(key_binary, keyp, 56)
@@ -59,7 +51,7 @@ def brute_force_attack(args):
         decrypted_text = Decryption.decrypt(cipher_text, rkb, rk, sboxes)
         if decrypted_text == original_plain_text:
             print("Clave encontrada:", DES.bin_to_hex(key_permuted))
-            return  # Exit the function immediately after finding the key
+            return DES.bin_to_hex(key_permuted)
     return None
 
 
@@ -158,23 +150,16 @@ def main():
     print("Iniciando ataque de fuerza bruta...")
     start_time = time.time()
 
-    num_processes = multiprocessing.cpu_count()  # Number of CPU cores
     chunk_size = 2**20  # Chunk size for each process
     total_keys = 2**64  # Total number of keys
 
     # Create a pool of processes
-    pool = multiprocessing.Pool(num_processes)
-
-    # Perform brute force attack on each chunk
-    for start in range(0, total_keys, chunk_size * num_processes):
-        end = min(start + chunk_size * num_processes, total_keys)
-        pool.map_async(brute_force_attack, [(cipher_text_without_AI, shift_table, keyp, key_comp,
-                                             sboxes_without_AI, original_plain_text,
-                                             i*chunk_size, (i+1)*chunk_size)
-                                            for i in range(start, end, chunk_size)])
-
-    pool.close()
-    pool.join()
+    with concurrent.futures.ProcessPoolExecutor() as executor:
+        # Perform brute force attack on each chunk
+        for start in range(0, total_keys, chunk_size):
+            end = min(start + chunk_size, total_keys)
+            executor.map(partial(brute_force_attack, cipher_text_without_AI, shift_table, keyp, key_comp,
+                                 sboxes_without_AI, original_plain_text), range(start, end, chunk_size))
 
     end_time = time.time()
     elapsed_time = end_time - start_time
