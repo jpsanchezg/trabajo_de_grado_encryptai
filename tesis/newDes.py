@@ -5,8 +5,8 @@ from pymoo.core.problem import Problem
 from pymoo.optimize import minimize
 import secrets
 import matplotlib.pyplot as plt
-from concurrent.futures import ProcessPoolExecutor
-import sys
+import concurrent.futures
+from functools import partial
 
 
 class DES:
@@ -195,8 +195,10 @@ class DES:
         # Generate round keys
         for i in range(16):
             # Perform left circular shift on left and right halves
-            left_half = left_half[left_shift_schedule[i]:] + left_half[:left_shift_schedule[i]]
-            right_half = right_half[left_shift_schedule[i]:] + right_half[:left_shift_schedule[i]]
+            left_half = left_half[left_shift_schedule[i]
+                :] + left_half[:left_shift_schedule[i]]
+            right_half = right_half[left_shift_schedule[i]
+                :] + right_half[:left_shift_schedule[i]]
 
             # Combine left and right halves
             combined_halves = left_half + right_half
@@ -407,6 +409,64 @@ class AIMODEL:
                 table[(input_mask, output_mask)] = count
         return table
 
+    def compute_correlation(input_mask, output_mask, sbox):
+        correlation = 0
+        sum_ = 0
+        n = int(np.log2(len(sbox)))
+        for input_val in range(0, 2 ** n):
+            input_val_xor_input_mask = input_val ^ (
+                input_val & input_mask)
+            output_val = sbox[input_val]
+            if isinstance(output_val, np.ndarray):
+                output_val_scalar = np.sum(output_val)
+            else:
+                output_val_scalar = output_val
+            output_val_xor_output_mask = output_val_scalar ^ (
+                output_val_scalar & output_mask)
+            sum_ += bin(input_val_xor_input_mask).count(
+                '1') ^ bin(output_val_xor_output_mask).count('1')
+        correlation += (-1) ** bin(sum_).count('1')
+        correlation = abs(correlation / (2 ** n))
+        return correlation
+
+    @staticmethod
+    def linearity(sbox):
+        n = int(np.log2(len(sbox)))
+        max_abs_correlation = 0
+
+        total_iterations = (2 ** n - 1) ** 2  # Total de iteraciones
+        completed_iterations = 0
+        chunk_size = 1000  # Adjust this value according to your memory constraints
+
+        chunks = []
+        for input_mask in range(1, 2 ** n):
+            for output_mask in range(1, 2 ** n):
+                chunks.append((input_mask, output_mask))
+
+        with concurrent.futures.ProcessPoolExecutor() as executor:
+            for i in range(0, len(chunks), chunk_size):
+                chunk = chunks[i:i+chunk_size]
+                compute_partial = partial(AIMODEL.compute_correlation, sbox=sbox)
+                futures = [executor.submit(compute_partial, *params)
+                           for params in chunk]
+                for future in concurrent.futures.as_completed(futures):
+                    correlation = future.result()
+                    max_abs_correlation = max(max_abs_correlation, correlation)
+                    completed_iterations += len(chunk)
+                    progress_percentage = (
+                        completed_iterations / total_iterations) * 100
+                    print(
+                        f"\rProgreso: {progress_percentage:.2f}%", end='', flush=True)
+
+        print()  # Print a new line at the end for clean output
+
+        return 1 - 2 * max_abs_correlation
+
+
+
+
+    
+
     @staticmethod
     def geneticModel(num_sboxes, population_size):
         num_variables = num_sboxes * 64
@@ -455,47 +515,6 @@ class AIMODEL:
         return dlct_score_total
 
 
-def calculate_correlation(input_mask, output_mask, sbox):
-    correlation = 0
-    sum_ = 0
-    n = len(sbox)
-    for input_val in range(0, 2 ** n):
-        input_val_xor_input_mask = input_val ^ (input_val & input_mask)
-        output_val_xor_output_mask = sbox[input_val][0] ^ (
-            sbox[input_val][0] & output_mask)
-        sum_ += bin(input_val_xor_input_mask).count(
-            '1') ^ bin(output_val_xor_output_mask).count('1')
-    correlation += (-1) ** bin(sum_).count('1')
-    correlation = abs(correlation / (2 ** n))
-    return correlation
-
-
-class TESTING:
-    @staticmethod
-    def linearity(sbox):
-        n = len(sbox)
-        max_abs_correlation = 0
-
-        total_iterations = (2 ** n - 1) ** 2
-        completed_iterations = 0
-
-        with ProcessPoolExecutor() as executor:
-            futures = []
-            for input_mask in range(1, 2 ** n):
-                for output_mask in range(1, 2 ** n):
-                    future = executor.submit(
-                        calculate_correlation, input_mask, output_mask, sbox)
-                    future.add_done_callback(
-                        lambda f: sys.stdout.write(
-                            f"\rProgreso: {((completed_iterations + 1) / total_iterations) * 100:.2f}%")
-                    )
-                    futures.append(future)
-                    completed_iterations += 1
-
-        print()
-        return 1 - 2 * max_abs_correlation
-
-
 class SboxProblem(Problem):
     def __init__(self, num_sboxes, xl=None, xu=None):
         super().__init__(n_var=num_sboxes * 64, n_obj=1,
@@ -526,7 +545,7 @@ class SboxProblem(Problem):
 def main():
     pt = "ADC0326456789BAEF"
     print(" Before the encription Plain Text : ", pt)
-    num_sboxes = 64
+    num_sboxes = 32
     # Key generation for DES algorithm without AI
     key_without_AI = DES.generate_key(key_length=128)
     key_without_AI = DES.hex_to_bin(key_without_AI)
@@ -583,10 +602,21 @@ def main():
         cipher_text_without_AI, rkb_without_AI, rk_without_AI, sboxes)
     print("Plain Text without AI: ", plain_text_without_AI)
 
+    sboxes = np.array(sboxes)
+    linearity_values_without_AI = AIMODEL.linearity(sboxes)
+
+    print("Correlación de linealidad de las S-boxes:",
+          linearity_values_without_AI)
+
     # DES with AI
 
     population_size = 100
     best_sboxes, best_score = AIMODEL.geneticModel(num_sboxes, population_size)
+
+    print("S-box found:" + str(best_sboxes))
+
+
+
     print("Best S-box found:")
     # print(best_sboxes.reshape(num_sboxes, 4, 16))
     print("DLCT score of the best S-box:", best_score)
@@ -600,9 +630,19 @@ def main():
     plain_text_with_AI = Decryption.decrypt(
         cipher_text_with_AI, rkb_with_AI, rk_with_AI, best_sboxes.reshape(num_sboxes, 4, 16))
     print("Decrypt result text with AI: ", plain_text_with_AI)
-    linearity_values = TESTING.linearity(sboxes)
+
+    diff_table = AIMODEL.differential_table(best_sboxes)
+    lin_table = AIMODEL.linear_table(best_sboxes)
+    best_sboxes = np.array(best_sboxes, dtype=np.int32)
+    linearity_values = AIMODEL.linearity(best_sboxes)
 
     print("Correlación de linealidad de las S-boxes:", linearity_values)
+
+    # Graficar la tabla de diferencias
+    AIMODEL.plot_table(diff_table, 'Tabla de Diferencias con IA')
+
+    # Graficar la tabla de linealidad
+    AIMODEL.plot_table(lin_table, 'Tabla de Linealidad con IA')
 
 
 if __name__ == "__main__":

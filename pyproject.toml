@@ -10,6 +10,14 @@ python = "^3.10"
 numpy = "^1.26.4"
 pymoo = "^0.6.1.1"
 tabulate = "^0.9.0"
+numba = "^0.59.1"
+pyopencl = "^2024.1"
+joblib = "^1.4.2"
+torch = "^2.3.0"
+torchvision = "^0.18.0"
+torchaudio = "^2.3.0"
+pyhip = "^1.0.0"
+scipy = "^1.13.0"
 
 
 [build-system]
