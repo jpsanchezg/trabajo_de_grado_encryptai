@@ -2527,6 +2527,26 @@ torch = "2.3.0"
 scipy = ["scipy"]
 
 [[package]]
+name = "tqdm"
+version = "4.66.4"
+description = "Fast, Extensible Progress Meter"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "tqdm-4.66.4-py3-none-any.whl", hash = "sha256:b75ca56b413b030bc3f00af51fd2c1a1a5eac6a0c1cca83cbb37a5c52abce644"},
+    {file = "tqdm-4.66.4.tar.gz", hash = "sha256:e4d936c9de8727928f3be6079590e97d9abfe8d39a590be678eb5919ffc186bb"},
+]
+
+[package.dependencies]
+colorama = {version = "*", markers = "platform_system == \"Windows\""}
+
+[package.extras]
+dev = ["pytest (>=6)", "pytest-cov", "pytest-timeout", "pytest-xdist"]
+notebook = ["ipywidgets (>=6)"]
+slack = ["slack-sdk"]
+telegram = ["requests"]
+
+[[package]]
 name = "triton"
 version = "2.3.0"
 description = "A language and compiler for custom Deep Learning operations"
@@ -2704,4 +2724,4 @@ vis = ["matplotlib", "pyvista (>=0.33)"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "95e39bdc27074eb7a7ff660dcd3ecc5cd4fee4901663fa3a2a9ce58def3b8309"
+content-hash = "ed90a4ccb7e3efe82ef91e2faa6937b32a60798d7bddb145aff5e26b3bf9c445"

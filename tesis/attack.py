@@ -1,6 +1,6 @@
 import time
 import matplotlib.pyplot as plt
-from des import DES, Encryption, Decryption, AIMODEL
+from tesis.main import DES, Encryption, Decryption, AIMODEL
 from functools import partial
 import concurrent.futures
 
