@@ -26,15 +26,12 @@ class AIMODEL:
     def generate_sboxes(num_sboxes, rows=4, cols=16):
         sboxes = []
         for _ in range(num_sboxes):
-            # Initialize S-box with a random permutation
             initial_sbox = list(range(rows * cols))
             random.shuffle(initial_sbox)
-            # Minimize correlation using Differential Evolutionary Algorithm
             result = differential_evolution(AIMODEL.sbox_cost, [(0, rows*cols-1)]*(rows*cols),
                                             args=(), tol=1e-5, maxiter=100, popsize=15, mutation=(0.5, 1),
                                             recombination=0.7, seed=None, callback=None, disp=False,
                                             polish=True, init='latinhypercube', atol=0)
-            # Reshape the resulting permutation into rows and columns
             optimized_sbox = np.reshape(result.x, (rows, cols)).tolist()
             sboxes.append(optimized_sbox)
         return sboxes
@@ -79,9 +76,7 @@ class AIMODEL:
             else:
                 output_val_scalar = output_val
             if isinstance(output_val_scalar, np.ndarray):
-                # Convertir a escalar si es un array de numpy
                 output_val_scalar = output_val_scalar.item()
-            # Convertir a entero después de comprobaciones
             output_val_scalar = int(output_val_scalar)
             output_val_xor_output_mask = output_val_scalar ^ (
                 output_val_scalar & output_mask)
@@ -97,7 +92,7 @@ class AIMODEL:
         max_abs_correlation = 0
 
         total_iterations = (2 ** n - 1) ** 2  # Total de iteraciones
-        chunk_size = 4000  # Ajusta este valor según tus restricciones de memoria
+        chunk_size = 4000  
 
         chunks = []
         for input_mask in range(1, 2 ** n):
