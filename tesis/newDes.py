@@ -100,18 +100,27 @@ def main():
         cipher_text_with_AI, rkb_with_AI, rk_with_AI, best_sboxes.reshape(num_sboxes, 4, 16))
     print("Decrypt result text with AI: ", plain_text_with_AI)
 
-    diff_table = AIMODEL.differential_table(best_sboxes)
-    lin_table = AIMODEL.linear_table(best_sboxes)
-    best_sboxes = np.array(best_sboxes, dtype=np.int32)
-    linearity_values = AIMODEL.linearity(best_sboxes)
+    aes = AES(best_sboxes.reshape(num_sboxes, 4, 16))
 
-    print("Correlación de linealidad de las S-boxes:", linearity_values)
+    encrypted_message = aes.encrypt(pt)
+    print("Encrypted message:", encrypted_message)
 
-    # Graficar la tabla de diferencias
-    AIMODEL.plot_table(diff_table, 'Tabla de Diferencias con IA')
+    # Decrypt the message
+    decrypted_message = aes.decrypt(encrypted_message)
+    print("Decrypted message:", decrypted_message)
 
-    # Graficar la tabla de linealidad
-    AIMODEL.plot_table(lin_table, 'Tabla de Linealidad con IA')
+    #diff_table = AIMODEL.differential_table(best_sboxes)
+    #lin_table = AIMODEL.linear_table(best_sboxes)
+    #best_sboxes = np.array(best_sboxes, dtype=np.int32)
+    #linearity_values = AIMODEL.linearity(best_sboxes)
+#
+    #print("Correlación de linealidad de las S-boxes:", linearity_values)
+#
+    ## Graficar la tabla de diferencias
+    #AIMODEL.plot_table(diff_table, 'Tabla de Diferencias con IA')
+#
+    ## Graficar la tabla de linealidad
+    #AIMODEL.plot_table(lin_table, 'Tabla de Linealidad con IA')
 
 
 if __name__ == "__main__":

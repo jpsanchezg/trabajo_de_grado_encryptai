@@ -2,16 +2,14 @@ from pymoo.algorithms.soo.nonconvex.ga import GA
 from pymoo.core.problem import Problem
 from pymoo.optimize import minimize
 import numpy as np
-import matplotlib.pyplot as plt
 import random
 
-# esto es para el uso de todo el procesador para el cálculo de la correlación
-import concurrent.futures
-from tqdm import tqdm
-from functools import partial
+import random
 
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
 from scipy.optimize import differential_evolution
-class AIMODEL:
+class AI_MODEL:
     def __init__(self):
         pass
     @staticmethod
@@ -28,7 +26,7 @@ class AIMODEL:
         for _ in range(num_sboxes):
             initial_sbox = list(range(rows * cols))
             random.shuffle(initial_sbox)
-            result = differential_evolution(AIMODEL.sbox_cost, [(0, rows*cols-1)]*(rows*cols),
+            result = differential_evolution(AI_MODEL.sbox_cost, [(0, rows*cols-1)]*(rows*cols),
                                             args=(), tol=1e-5, maxiter=100, popsize=15, mutation=(0.5, 1),
                                             recombination=0.7, seed=None, callback=None, disp=False,
                                             polish=True, init='latinhypercube', atol=0)
@@ -36,82 +34,7 @@ class AIMODEL:
             sboxes.append(optimized_sbox)
         return sboxes
 
-    @staticmethod
-    def differential_table(sbox):
-        table = {}
-        for input_diff in range(16):
-            for output_diff in range(16):
-                xor_func = np.vectorize(lambda x: x ^ input_diff)
-                count = np.sum(sbox ^ xor_func(sbox) == output_diff)
-                table[(input_diff, output_diff)] = count
-        return table
-
-    @staticmethod
-    def linear_table(sboxes):
-        table = {}
-        for input_mask in range(16):
-            for output_mask in range(16):
-                count = 0
-                for input_val in range(16):
-                    sbox_row = sboxes[input_val]
-                    # Use np.nditer to iterate over elements of the numpy array
-                    for sbox_val in np.nditer(sbox_row):
-                        if bin(input_val & input_mask).count('1') ^ bin(sbox_val & output_mask).count('1') == 0:
-                            count += 1
-                table[(input_mask, output_mask)] = count
-        return table
-
-    @staticmethod
-    def compute_correlation(input_mask, output_mask, sbox):
-        correlation = 0
-        sum_ = 0
-        n = int(np.log2(len(sbox)))
-        input_mask = int(input_mask)  # Convertir a entero si no lo es
-        output_mask = int(output_mask)  # Convertir a entero si no lo es
-        for input_val in range(0, 2 ** n):
-            input_val_xor_input_mask = input_val ^ (input_val & input_mask)
-            output_val = sbox[input_val]
-            if isinstance(output_val, np.ndarray):
-                output_val_scalar = np.sum(output_val)
-            else:
-                output_val_scalar = output_val
-            if isinstance(output_val_scalar, np.ndarray):
-                output_val_scalar = output_val_scalar.item()
-            output_val_scalar = int(output_val_scalar)
-            output_val_xor_output_mask = output_val_scalar ^ (
-                output_val_scalar & output_mask)
-            sum_ += bin(input_val_xor_input_mask).count(
-                '1') ^ bin(output_val_xor_output_mask).count('1')
-        correlation += (-1) ** bin(sum_).count('1')
-        correlation = abs(correlation / (2 ** n))
-        return correlation
-
-    @staticmethod
-    def linearity(sbox):
-        n = int(np.log2(len(sbox)))
-        max_abs_correlation = 0
-
-        total_iterations = (2 ** n - 1) ** 2  # Total de iteraciones
-        chunk_size = 4000  
-
-        chunks = []
-        for input_mask in range(1, 2 ** n):
-            for output_mask in range(1, 2 ** n):
-                chunks.append((input_mask, output_mask))
-
-        with concurrent.futures.ProcessPoolExecutor() as executor, tqdm(total=total_iterations) as pbar:
-            for i in range(0, len(chunks), chunk_size):
-                chunk = chunks[i:i+chunk_size]
-                compute_partial = partial(AIMODEL.compute_correlation, sbox=sbox)
-                futures = [executor.submit(compute_partial, *params)
-                           for params in chunk]
-                for future in concurrent.futures.as_completed(futures):
-                    correlation = future.result()
-                    max_abs_correlation = max(max_abs_correlation, correlation)
-                    pbar.update(len(chunk))
-
-        return 1 - 2 * max_abs_correlation
-
+    
     @staticmethod
     def geneticModel(num_sboxes, population_size):
         num_variables = num_sboxes * 64
@@ -133,15 +56,7 @@ class AIMODEL:
 
         return best_solution, best_score
 
-    def plot_table(table, title):
-        fig, ax = plt.subplots()
-        ax.bar(range(len(table)), list(table.values()), align='center')
-        ax.set_xticks(range(len(table)))
-        ax.set_xticklabels(table.keys(), rotation=90)
-        ax.set_xlabel('Diferencia de entrada/salida')
-        ax.set_ylabel('Recuento')
-        ax.set_title(title)
-        plt.show()
+    
 
     @staticmethod
     def calculate_dlct_score(sboxes):
@@ -189,9 +104,9 @@ class SboxProblem(Problem):
 
     def _evaluate(self, X, out, *args, **kwargs):
         sboxes = np.array_split(X, self.num_sboxes)
-        dlct_score = AIMODEL.calculate_dlct_score(sboxes)
+        dlct_score = AI_MODEL.calculate_dlct_score(sboxes)
         differential_uniformity_score = np.mean(
-            [AIMODEL.calculate_differential_uniformity(sbox) for sbox in sboxes])
+            [AI_MODEL.calculate_differential_uniformity(sbox) for sbox in sboxes])
 
         # Adjust weights according to importance
         total_score = dlct_score * 0.6 + differential_uniformity_score * 0.4
@@ -209,3 +124,78 @@ class SboxProblem(Problem):
             xl = np.zeros(self.n_var)
             xu = np.ones(self.n_var)
         return xl, xu
+
+
+class QLearningAgent:
+    def __init__(self, num_sboxes, learning_rate=0.1, discount_factor=0.9, epsilon=0.1, episodes=10000):
+        self.num_sboxes = num_sboxes
+        self.num_variables = num_sboxes * 64
+        self.learning_rate = learning_rate
+        self.discount_factor = discount_factor
+        self.epsilon = epsilon
+        self.episodes = episodes
+        self.model = self.build_model()
+
+    def build_model(self):
+        model = Sequential()
+        model.add(Dense(64, input_dim=self.num_variables, activation='relu'))
+        model.add(Dense(32, activation='relu'))
+        # Output layer, linear activation
+        model.add(Dense(32, activation='linear'))
+        model.compile(loss='mse', optimizer='adam')
+        return model
+
+    def state_to_input(self, state):
+        return np.eye(32)[state].flatten()  # One-hot encode the state
+
+    def choose_action(self, state):
+        if random.uniform(0, 1) < self.epsilon:
+            return random.randint(0, 31)  # Explore: select a random action
+        else:
+            state_input = self.state_to_input(state)
+            q_values = self.model.predict(state_input.reshape(1, -1))[0]
+            # Exploit: select action with max Q-value
+            return np.argmax(q_values)
+
+    def learn(self, current_state, action, reward, next_state):
+        current_state_input = self.state_to_input(current_state)
+        next_state_input = self.state_to_input(next_state)
+
+        target = reward + self.discount_factor * \
+            np.amax(self.model.predict(next_state_input.reshape(1, -1))[0])
+        target_full = self.model.predict(current_state_input.reshape(1, -1))[0]
+        target_full[action] = target
+        self.model.fit(current_state_input.reshape(1, -1),
+                       target_full.reshape(-1, 32), epochs=1, verbose=0)
+
+    def objective_function(self, sbox):
+        # Placeholder for the actual objective function
+        # Calculate properties such as nonlinearity, differential uniformity, etc.
+        return np.random.random()  # Example: random reward
+
+    def train(self):
+        best_solution = None
+        best_score = float('-inf')
+
+        for episode in range(self.episodes):
+            current_state = np.random.randint(0, 32, self.num_variables)
+            done = False
+            while not done:
+                action = self.choose_action(current_state)
+                next_state = current_state.copy()
+                next_state[random.randint(0, self.num_variables - 1)] = action
+
+                reward = self.objective_function(next_state)
+                self.learn(current_state, action, reward, next_state)
+
+                if reward > best_score:
+                    best_score = reward
+                    best_solution = next_state.copy()
+
+                current_state = next_state
+
+                # Placeholder condition to end an episode
+                if np.random.random() < 0.1:
+                    done = True
+
+        return best_solution, best_score
