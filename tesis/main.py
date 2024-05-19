@@ -2,15 +2,38 @@ from des import DES
 from Encryption import Encryption, Decryption
 from Aimodel import AI_MODEL, QLearningAgent
 import numpy as np
+import random
+import binascii
 
 from analisis import Test
 
 
 
-
+def limitar_y_mapear(cadena_hex, diccionario):
+    resultado = ""
+    for caracter in cadena_hex[:16]:
+        # Mapear usando el diccionario, o mantener el carácter original si no está en el diccionario
+        resultado += diccionario.get(caracter, caracter)
+    return resultado
 
 def main():
-    pt = "ADC0326456789BAEF"
+    diccionario_hex = {
+        '0': 'A', '1': 'B', '2': 'C', '3': 'D',
+        '4': 'E', '5': 'F', '6': '0', '7': '1',
+        '8': '2', '9': '3', 'A': '4', 'B': '5',
+        'C': '6', 'D': '7', 'E': '8', 'F': '9'
+    }
+    mensaje_original = input("Ingresa el mensaje que deseas codificar: ")
+
+    mensaje_bytes = mensaje_original.encode('utf-8')
+    
+    diccionario_hex_inverso = {
+        valor: clave for clave, valor in diccionario_hex.items()}
+
+    mensaje_hex = binascii.hexlify(mensaje_bytes).decode('utf-8')
+    resultado_final = limitar_y_mapear(mensaje_hex, diccionario_hex)
+    resultado_final = resultado_final.upper()
+    pt = resultado_final
     print(" Before the encription Plain Text : ", pt)
     keyp = [
         57, 49, 41, 33, 25, 17, 9, 1,
@@ -61,7 +84,7 @@ def main():
                  [1, 15, 13, 8, 10, 3, 7, 4, 12, 5, 6, 11, 0, 14, 9, 2],
                  [7, 11, 4, 1, 9, 12, 14, 2, 0, 6, 10, 13, 15, 3, 5, 8],
                  [2, 1, 14, 7, 4, 10, 8, 13, 15, 12, 9, 0, 3, 5, 6, 11]]]
-    num_sboxes = 8
+    num_sboxes = 16
     print("num_sboxes: ", num_sboxes)
     # Key generation for DES algorithm without AI
     key_without_AI = DES.generate_key(key_length=128)
@@ -114,6 +137,11 @@ def main():
     plain_text_without_AI = Decryption.decrypt(
         cipher_text_without_AI, rkb_without_AI, rk_without_AI, des_sbox)
     print("Plain Text without AI: ", plain_text_without_AI)
+    mensaje_decodificado_hex = limitar_y_mapear(
+        plain_text_without_AI, diccionario_hex_inverso)
+
+    
+    
 
     
 
@@ -168,36 +196,38 @@ def main():
     print("Decrypt result text with AI: ", plain_text_with_AI)
     print("")
     print("")
-    print("Testing the Nonlinearity of the S-boxes")
-    print("")
-    #Test the linearity of the S-boxes
-    sboxdes = np.array(des_sbox, dtype=np.int32)
-    linearity_values_des = Test.linearity(sboxdes)
-    print("")
-    
-
-    sboxgenetic = np.array(sbox_genetic, dtype=np.int32)
-    linearity_values_genetic = Test.linearity(sboxgenetic)
-    print("")
-    
-
-    sboxqlearning = np.array(sbox_qlearning, dtype=np.int32)
-    linearity_values_qlearning = Test.linearity(sboxqlearning)
-    print("")
-    print("Lineal correlation Sboxes Des:", linearity_values_des)
-    print("")
-    print("Lineal correlation Sboxes Genetic:", linearity_values_genetic)
-    print("")
-    print("Lineal correlation Sboxes Qlearning:", linearity_values_qlearning)
+    #print("Testing the Nonlinearity of the S-boxes")
+    #print("")
+    ##Test the linearity of the S-boxes
+    #sboxdes = np.array(des_sbox, dtype=np.int32)
+    #linearity_values_des = Test.linearity(sboxdes)
+    #print("")
+    #
+#
+    #sboxgenetic = np.array(sbox_genetic, dtype=np.int32)
+    #linearity_values_genetic = Test.linearity(sboxgenetic)
+    #print("")
+    #
+#
+    #sboxqlearning = np.array(sbox_qlearning, dtype=np.int32)
+    #linearity_values_qlearning = Test.linearity(sboxqlearning)
+    #print("")
+    #print("Lineal correlation Sboxes Des:", linearity_values_des)
+    #print("")
+    #print("Lineal correlation Sboxes Genetic:", linearity_values_genetic)
+    #print("")
+    #print("Lineal correlation Sboxes Qlearning:", linearity_values_qlearning)
 
 
     # preparando las sboxes para el SAC (SAC: Strict Avalanche Criterion)
     sbox_genetic = np.array(
-        sbox_genetic, dtype=np.uint8).reshape(8, 64)
-    
-    des_sbox = np.array(des_sbox, dtype=np.uint8).reshape(8, 64)
+        sbox_genetic, dtype=np.uint8).reshape(num_sboxes, num_sboxes*num_sboxes)
 
-    sbox_qlearning = np.array(sbox_qlearning, dtype=np.uint8).reshape(8, 64)
+    des_sbox = np.array(des_sbox, dtype=np.uint8).reshape(
+        num_sboxes, num_sboxes*num_sboxes)
+
+    sbox_qlearning = np.array(
+        sbox_qlearning, dtype=np.uint8).reshape(num_sboxes, num_sboxes*num_sboxes)
 
 
     print("")
