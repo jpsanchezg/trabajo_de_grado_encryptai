@@ -21,6 +21,8 @@ scipy = "^1.13.0"
 tqdm = "^4.66.4"
 pycryptodome = "^3.20.0"
 keras = "^3.3.3"
+seaborn = "^0.13.2"
+cryptanalysis = "^0.0.3"
 
 
 [build-system]

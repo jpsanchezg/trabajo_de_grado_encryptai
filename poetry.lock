@@ -353,6 +353,21 @@ test = ["Pillow", "contourpy[test-no-images]", "matplotlib"]
 test-no-images = ["pytest", "pytest-cov", "pytest-xdist", "wurlitzer"]
 
 [[package]]
+name = "cryptanalysis"
+version = "0.0.3"
+description = "Automated cryptanalysis library for substitution permutation network"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "cryptanalysis-0.0.3-py3-none-any.whl", hash = "sha256:3d917aef3c6707c9098b3ded1d9a3af317c66753b825646126665a2624e4232f"},
+    {file = "cryptanalysis-0.0.3.tar.gz", hash = "sha256:ff4305458d94e7003157549e1807d5c9f57b324de8fc6c3a4f515e9e8ac1bef1"},
+]
+
+[package.dependencies]
+tqdm = "*"
+z3-solver = "*"
+
+[[package]]
 name = "cycler"
 version = "0.12.1"
 description = "Composable style cycles"
@@ -2469,6 +2484,27 @@ doc = ["jupyterlite-pyodide-kernel", "jupyterlite-sphinx (>=0.12.0)", "jupytext"
 test = ["array-api-strict", "asv", "gmpy2", "hypothesis (>=6.30)", "mpmath", "pooch", "pytest", "pytest-cov", "pytest-timeout", "pytest-xdist", "scikit-umfpack", "threadpoolctl"]
 
 [[package]]
+name = "seaborn"
+version = "0.13.2"
+description = "Statistical data visualization"
+optional = false
+python-versions = ">=3.8"
+files = [
+    {file = "seaborn-0.13.2-py3-none-any.whl", hash = "sha256:636f8336facf092165e27924f223d3c62ca560b1f2bb5dff7ab7fad265361987"},
+    {file = "seaborn-0.13.2.tar.gz", hash = "sha256:93e60a40988f4d65e9f4885df477e2fdaff6b73a9ded434c1ab356dd57eefff7"},
+]
+
+[package.dependencies]
+matplotlib = ">=3.4,<3.6.1 || >3.6.1"
+numpy = ">=1.20,<1.24.0 || >1.24.0"
+pandas = ">=1.2"
+
+[package.extras]
+dev = ["flake8", "flit", "mypy", "pandas-stubs", "pre-commit", "pytest", "pytest-cov", "pytest-xdist"]
+docs = ["ipykernel", "nbconvert", "numpydoc", "pydata_sphinx_theme (==0.10.0rc2)", "pyyaml", "sphinx (<6.0.0)", "sphinx-copybutton", "sphinx-design", "sphinx-issues"]
+stats = ["scipy (>=1.7)", "statsmodels (>=0.12)"]
+
+[[package]]
 name = "showy"
 version = "0.1.5"
 description = "Helper for matplotlib subplots."
@@ -2900,7 +2936,23 @@ pyhip = "*"
 [package.extras]
 vis = ["matplotlib", "pyvista (>=0.33)"]
 
+[[package]]
+name = "z3-solver"
+version = "4.13.0.0"
+description = "an efficient SMT solver library"
+optional = false
+python-versions = "*"
+files = [
+    {file = "z3-solver-4.13.0.0.tar.gz", hash = "sha256:52588e92aec7cb338fd6288ce93758ae01770f62ca0c80e8f4f2b2333feaf51b"},
+    {file = "z3_solver-4.13.0.0-py2.py3-none-macosx_11_0_arm64.whl", hash = "sha256:bca7d59a699a440247537c2180c519d682c9df3520a16ce288fced61a70d253d"},
+    {file = "z3_solver-4.13.0.0-py2.py3-none-macosx_11_0_x86_64.whl", hash = "sha256:4a4731fded91b32e1861e1c7c96e500da743bb9431246cac51f7c3ffc0f21b5d"},
+    {file = "z3_solver-4.13.0.0-py2.py3-none-manylinux2014_aarch64.whl", hash = "sha256:9d622022a3511c059915c56b2c231c84b5c1be1b82f457d7560dda3d916474fe"},
+    {file = "z3_solver-4.13.0.0-py2.py3-none-manylinux2014_x86_64.whl", hash = "sha256:8c42de82b6e3ff7ee61287d03c7af8a99f9f6554cdd1204c6b9bca96ff1cb7fb"},
+    {file = "z3_solver-4.13.0.0-py2.py3-none-win32.whl", hash = "sha256:13468e1018c817b7f794898d3100f02541d15c13ab56c0785c5acdea32a066cf"},
+    {file = "z3_solver-4.13.0.0-py2.py3-none-win_amd64.whl", hash = "sha256:3555436cfe9a5fa2d1b432fb9a5e4460e487649c22e5e68a56f7d81594d043e9"},
+]
+
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "381e23050bce5481feda3648cfb5c846338944d2ccf9152b925146fc16baa219"
+content-hash = "02a562d9660fb131e77f7bc3164f8285273552d6df74d053a726c34dbb7eb2ac"

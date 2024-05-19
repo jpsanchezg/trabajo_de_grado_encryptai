@@ -1,10 +1,9 @@
-import numpy as np
 from des import DES
 from Encryption import Encryption, Decryption
 from Aimodel import AI_MODEL, QLearningAgent
+import numpy as np
 
-
-from test import Test
+from analisis import Test
 
 
 
@@ -105,7 +104,6 @@ def main():
         shift_table, key_comp, left, right, left_with_AI, right_with_AI)
 
     # DES without AI
-    sboxes = AI_MODEL.generate_sboxes(num_sboxes)
 
     print("Encryption without AI")
     cipher_text_without_AI = DES.bin_to_hex(
@@ -117,11 +115,7 @@ def main():
         cipher_text_without_AI, rkb_without_AI, rk_without_AI, des_sbox)
     print("Plain Text without AI: ", plain_text_without_AI)
 
-    des_sbox = np.array(des_sbox)
-    linearity_values_without_AI = Test.linearity(des_sbox)
-
-    print("Correlación de linealidad de las S-boxes:",
-          linearity_values_without_AI)
+    
 
     # DES with AI
 
@@ -129,26 +123,77 @@ def main():
 
 
     population_size = 100
-    best_sboxes, best_score = AI_MODEL.geneticModel(num_sboxes, population_size)
+    sbox_genetic, best_score = AI_MODEL.geneticModel(
+        num_sboxes, population_size)
     best_score = np.round(best_score, 2)
     print("Best score: ", best_score)
     print("Encryption with AI")
     cipher_text_with_AI = DES.bin_to_hex(Encryption.encrypt(
-        pt, rkb_with_AI, rk_with_AI, best_sboxes.reshape(num_sboxes, 4, 16)))
+        pt, rkb_with_AI, rk_with_AI, sbox_genetic.reshape(num_sboxes, 4, 16)))
     
     print("Cipher Text with AI: ", cipher_text_with_AI)
 
     print("Decryption with AI")
     plain_text_with_AI = Decryption.decrypt(
-        cipher_text_with_AI, rkb_with_AI, rk_with_AI, best_sboxes.reshape(num_sboxes, 4, 16))
+        cipher_text_with_AI, rkb_with_AI, rk_with_AI, sbox_genetic.reshape(num_sboxes, 4, 16))
     print("Decrypt result text with AI: ", plain_text_with_AI)
-
+  
+    
     print("Encryption with Q-Learning")
     agent = QLearningAgent(num_sboxes)
-    best_solution, best_score = agent.train()
-    print("Best Solution:", best_solution)
+    sbox_qlearning, best_score = agent.train()
+    print("Best Solution:", sbox_qlearning)
     print("Best Score:", best_score)
+
+    print("Encryption with AI")
+    cipher_text_with_AI = DES.bin_to_hex(Encryption.encrypt(
+        pt, rkb_with_AI, rk_with_AI, sbox_qlearning.reshape(num_sboxes, 4, 16)))
     
+    print("Cipher Text with AI: ", cipher_text_with_AI)
+
+    print("Decryption with AI")
+    plain_text_with_AI = Decryption.decrypt(
+        cipher_text_with_AI, rkb_with_AI, rk_with_AI, sbox_qlearning.reshape(num_sboxes, 4, 16))
+    print("Decrypt result text with AI: ", plain_text_with_AI)
+
+    ## Test the linearity of the S-boxes
+    #for sbox, label in zip([des_sbox, sbox_genetic, sbox_qlearning], ['Normal', 'Genética', 'Q-learning']):
+    #    correlations, linearity_value = Test.linearity(sbox)
+    #    print(f'Linealidad para S-box {label}: {linearity_value}')
+    #    Test.plot_correlations(
+    #        correlations, f'Correlaciones para S-box {label}')
+    
+
+    # preparando las sboces para el SAC (SAC: Strict Avalanche Criterion)
+    sbox_genetic = np.array(sbox_genetic)
+    sbox_genetic = np.array(sbox_genetic).reshape(8, 64)
+    
+    des_sbox = np.array(des_sbox)
+    des_sbox = np.array(des_sbox).reshape(8, 64)
+
+    sbox_qlearning = np.array(sbox_qlearning)
+    sbox_qlearning = np.array(sbox_qlearning).reshape(8, 64)
+    print("Normal Sboxes")
+    print("")
+    for i, sbox in enumerate(des_sbox):
+        average_sac = Test.calculate_average_sac(sbox)
+        print(f"S-box {i + 1}: Average SAC for Normal sboxes = {average_sac:.2f}")
+
+
+    print("Genetic Algorithm")
+    print("")
+    for i, sbox in enumerate(sbox_genetic):
+        average_sac = Test.calculate_average_sac(sbox)
+        print(
+            f"S-box {i + 1}: Average SAC for Genetic sboxes= {average_sac:.2f}")
+    print("Q Learning")
+    print("")
+    for i, sbox in enumerate(sbox_qlearning):
+        average_sac = Test.calculate_average_sac(sbox)
+        print(
+            f"S-box {i + 1}: Average SAC for Q Learning sboxes= {average_sac:.2f}")
+# print(Test.differential_analysis(sbox_qlearning))
+
     # diff_table = Test.differential_table(best_sboxes)
     # lin_table = Test.linear_table(best_sboxes)
     # best_sboxes = np.array(best_sboxes, dtype=np.int32)

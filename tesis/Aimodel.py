@@ -3,60 +3,70 @@ from pymoo.core.problem import Problem
 from pymoo.optimize import minimize
 import numpy as np
 import random
-
-import random
-
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense
 from scipy.optimize import differential_evolution
+
+from analisis import Test
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
 class AI_MODEL:
     def __init__(self):
         pass
+
     @staticmethod
-    def sbox_cost(sbox):
-        # Calculate the linear correlation coefficient
-        correlation = np.corrcoef(
-            np.array(sbox).flatten(), np.array(sbox).flatten())[0, 1]
-        # Cost is the negative of correlation to minimize it
-        return -abs(correlation)
+    def sbox_cost(params, rows=8, cols=64):  # Ahora recibe una población de S-boxes
+        sboxes = np.array(params).reshape(-1, rows, cols)
+        costs = []
+        for sbox in sboxes:
+            correlation = np.corrcoef(sbox.flatten(), sbox.flatten())[0, 1]
+            cost_correlation = -abs(correlation)
+
+            average_sac = Test.calculate_average_sac(sbox)
+            cost_sac = -(average_sac - 0.4)**2
+
+            total_cost = 0.3 * cost_correlation + 0.7 * cost_sac
+            costs.append(total_cost)
+
+        return costs
 
     @staticmethod
     def generate_sboxes(num_sboxes, rows=4, cols=16):
         sboxes = []
+        bounds = [(0, 31) for _ in range(rows * cols)]
         for _ in range(num_sboxes):
             initial_sbox = list(range(rows * cols))
             random.shuffle(initial_sbox)
-            result = differential_evolution(AI_MODEL.sbox_cost, [(0, rows*cols-1)]*(rows*cols),
-                                            args=(), tol=1e-5, maxiter=100, popsize=15, mutation=(0.5, 1),
-                                            recombination=0.7, seed=None, callback=None, disp=False,
-                                            polish=True, init='latinhypercube', atol=0)
+            result = differential_evolution(
+                AI_MODEL.sbox_cost,
+                bounds,
+                args=(rows, cols),  # Pass the rows and cols to sbox_cost
+                maxiter=100,
+                popsize=15,
+                disp=False,
+                polish=True,
+            )
             optimized_sbox = np.reshape(result.x, (rows, cols)).tolist()
             sboxes.append(optimized_sbox)
         return sboxes
 
-    
     @staticmethod
     def geneticModel(num_sboxes, population_size):
         num_variables = num_sboxes * 64
         lower_bound = 0
-        upper_bound = 31  # Upper bound set to the maximum value in the sbox
+        upper_bound = 31
 
-        # Array filled with lower_bound
         xl = np.full(num_variables, lower_bound)
-        # Array filled with upper_bound
         xu = np.full(num_variables, upper_bound)
         problem = SboxProblem(num_sboxes, xl=xl, xu=xu)
         algorithm = GA(pop_size=population_size)
 
         res = minimize(problem, algorithm, seed=1, verbose=False)
 
-        best_solution = np.round(res.X).astype(
-            int)  # Round the solution to integers
+        best_solution = np.round(res.X).astype(int)
         best_score = res.F[0]
 
         return best_solution, best_score
-
-    
 
     @staticmethod
     def calculate_dlct_score(sboxes):
@@ -74,6 +84,7 @@ class AI_MODEL:
             dlct_score_total += dlct_score_sbox
         return dlct_score_total
 
+    @staticmethod
     def calculate_differential_uniformity(sbox):
         min_differential_probability = float('inf')
         for input_diff in range(0, 16):
@@ -83,7 +94,6 @@ class AI_MODEL:
                 count = 0
                 for sbox_row in sbox:
                     for x in range(16):
-                        # Convert each element of the sbox row to integer before XOR operation
                         sbox_x = int(sbox_row[x])
                         sbox_x_diff = int(sbox_row[(x ^ input_diff) % 16])
                         if np.bitwise_xor(sbox_x, sbox_x_diff) == output_diff:
@@ -128,50 +138,68 @@ class SboxProblem(Problem):
 
 class QLearningAgent:
     def __init__(self, num_sboxes, learning_rate=0.1, discount_factor=0.9, epsilon=0.1, episodes=10000):
+
         self.num_sboxes = num_sboxes
         self.num_variables = num_sboxes * 64
         self.learning_rate = learning_rate
         self.discount_factor = discount_factor
         self.epsilon = epsilon
         self.episodes = episodes
-        self.model = self.build_model()
+        self.device = torch.device(
+            'cuda' if torch.cuda.is_available() else 'cpu')
+        self.model = self.build_model().to(self.device)
+        self.optimizer = optim.Adam(
+            self.model.parameters(), lr=self.learning_rate)
+        self.loss_fn = nn.MSELoss()
 
     def build_model(self):
-        model = Sequential()
-        model.add(Dense(64, input_dim=self.num_variables, activation='relu'))
-        model.add(Dense(32, activation='relu'))
-        # Output layer, linear activation
-        model.add(Dense(32, activation='linear'))
-        model.compile(loss='mse', optimizer='adam')
-        return model
+        
+        return nn.Sequential(
+            nn.Linear(self.num_variables * 32, 64),  # Capa de entrada
+            nn.ReLU(),
+            nn.Linear(64, 32),  # Capa oculta
+            nn.ReLU(),
+            nn.Linear(32, 32)  # Capa de salida
+        )
 
     def state_to_input(self, state):
-        return np.eye(32)[state].flatten()  # One-hot encode the state
+        
+        return torch.tensor(np.eye(32)[state].flatten(), dtype=torch.float32, device=self.device)
 
     def choose_action(self, state):
+        
         if random.uniform(0, 1) < self.epsilon:
-            return random.randint(0, 31)  # Explore: select a random action
+            # Explorar: seleccionar una acción aleatoria
+            return random.randint(0, 31)
         else:
-            state_input = self.state_to_input(state)
-            q_values = self.model.predict(state_input.reshape(1, -1))[0]
-            # Exploit: select action with max Q-value
-            return np.argmax(q_values)
+            state_input = self.state_to_input(state).unsqueeze(0)
+            with torch.no_grad():
+                q_values = self.model(state_input)
+            # Explotar: seleccionar la acción con el valor Q máximo
+            return q_values.argmax().item()
 
     def learn(self, current_state, action, reward, next_state):
-        current_state_input = self.state_to_input(current_state)
-        next_state_input = self.state_to_input(next_state)
+        
+        current_state_input = self.state_to_input(current_state).unsqueeze(0)
+        next_state_input = self.state_to_input(next_state).unsqueeze(0)
+
+        self.optimizer.zero_grad()
+
+        current_q_values = self.model(current_state_input)
+        next_q_values = self.model(next_state_input)
 
         target = reward + self.discount_factor * \
-            np.amax(self.model.predict(next_state_input.reshape(1, -1))[0])
-        target_full = self.model.predict(current_state_input.reshape(1, -1))[0]
-        target_full[action] = target
-        self.model.fit(current_state_input.reshape(1, -1),
-                       target_full.reshape(-1, 32), epochs=1, verbose=0)
+            torch.max(next_q_values).item()
+        target_f = current_q_values.clone()
+        target_f[0, action] = target
+
+        loss = self.loss_fn(current_q_values, target_f)
+        loss.backward()
+        self.optimizer.step()
 
     def objective_function(self, sbox):
-        # Placeholder for the actual objective function
-        # Calculate properties such as nonlinearity, differential uniformity, etc.
-        return np.random.random()  # Example: random reward
+        
+        return np.random.random()  # Ejemplo: recompensa aleatoria
 
     def train(self):
         best_solution = None
@@ -194,7 +222,7 @@ class QLearningAgent:
 
                 current_state = next_state
 
-                # Placeholder condition to end an episode
+                # Condición de finalización de un episodio
                 if np.random.random() < 0.1:
                     done = True
 
