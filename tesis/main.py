@@ -125,10 +125,13 @@ def main():
 
     de_sboxes, sa_sboxes = AI_MODEL.generate_sboxes_combined(
         num_sboxes)
-    print("Differential Evolution S-boxes:")
-    print(de_sboxes)
-    print("\nSimulated Annealing S-boxes:")
-    print(sa_sboxes)
+
+    desboxes = np.array(de_sboxes, dtype=np.int32)
+    sasboxes = np.array(sa_sboxes, dtype=np.int32)
+    lineality_de = Test.linearity(desboxes)
+    lineality_sa = Test.linearity(sasboxes)
+    print("Lineal correlation Sboxes Des:", lineality_de)
+    print("Lineal correlation Sboxes SA:", lineality_sa)
 
 
     # Use combined sboxes in geneticModel:
@@ -163,29 +166,40 @@ def main():
     plain_text_with_AI = Decryption.decrypt(
         cipher_text_with_AI, rkb_with_AI, rk_with_AI, sbox_qlearning.reshape(num_sboxes, 4, 16))
     print("Decrypt result text with AI: ", plain_text_with_AI)
-
+    print("")
+    print("")
+    print("Testing the Nonlinearity of the S-boxes")
+    print("")
     #Test the linearity of the S-boxes
     sboxdes = np.array(des_sbox, dtype=np.int32)
-    linearity_values = Test.linearity(sboxdes)
-    print("Lineal correlation Sboxes Des:", linearity_values)
+    linearity_values_des = Test.linearity(sboxdes)
+    print("")
+    
 
     sboxgenetic = np.array(sbox_genetic, dtype=np.int32)
-    linearity_values = Test.linearity(sboxgenetic)
-    print("Lineal correlation Sboxes Genetic:", linearity_values)
+    linearity_values_genetic = Test.linearity(sboxgenetic)
+    print("")
+    
 
     sboxqlearning = np.array(sbox_qlearning, dtype=np.int32)
-    linearity_values = Test.linearity(sboxqlearning)
-    print("Lineal correlation Sboxes Genetic:", linearity_values)
+    linearity_values_qlearning = Test.linearity(sboxqlearning)
+    print("")
+    print("Lineal correlation Sboxes Des:", linearity_values_des)
+    print("")
+    print("Lineal correlation Sboxes Genetic:", linearity_values_genetic)
+    print("")
+    print("Lineal correlation Sboxes Qlearning:", linearity_values_qlearning)
 
 
-    # preparando las sboces para el SAC (SAC: Strict Avalanche Criterion)
+    # preparando las sboxes para el SAC (SAC: Strict Avalanche Criterion)
     sbox_genetic = np.array(
         sbox_genetic, dtype=np.uint8).reshape(8, 64)
     
-    des_sbox = np.array(des_sbox, dtype=np.uint8).reshape( 8, 64)
+    des_sbox = np.array(des_sbox, dtype=np.uint8).reshape(8, 64)
 
-    #sbox_qlearning = np.array(sbox_qlearning)
-    #sbox_qlearning = np.array(sbox_qlearning).reshape(8, 64)
+    sbox_qlearning = np.array(sbox_qlearning, dtype=np.uint8).reshape(8, 64)
+
+
     print("")
     print("")
     print("Normal Sboxes")
@@ -207,23 +221,11 @@ def main():
     print("Q Learning")
     print("")
     for i, sbox in enumerate(sbox_qlearning):
-        average_sac = Test.calculate_average_sac(sbox)
+        average_sac = Test.calculate_average_sac_results(sbox)
         print(
             f"S-box {i + 1}: Average SAC for Q Learning sboxes= {average_sac:.2f}")
-# print(Test.differential_analysis(sbox_qlearning))
-
-    # diff_table = Test.differential_table(best_sboxes)
-    # lin_table = Test.linear_table(best_sboxes)
-    # best_sboxes = np.array(best_sboxes, dtype=np.int32)
-    # linearity_values = Test.linearity(best_sboxes)
-#
-    # print("Correlación de linealidad de las S-boxes:", linearity_values)
-#
-    # Graficar la tabla de diferencias
-    # Test.plot_table(diff_table, 'Tabla de Diferencias con IA')
-#
-    # Graficar la tabla de linealidad
-    # Test.plot_table(lin_table, 'Tabla de Linealidad con IA')
+    print("")
+    print("")
 
 
 if __name__ == "__main__":

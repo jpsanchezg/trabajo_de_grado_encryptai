@@ -36,29 +36,23 @@ class Test:
         correlation = 0
         sum_ = 0
         n = int(np.log2(len(sbox)))
-        input_mask = int(input_mask)
-        output_mask = int(output_mask)
-
-        for input_val in range(2 ** n):
-            # XOR del valor de entrada con la máscara de entrada
+        input_mask = int(input_mask)  # Convertir a entero si no lo es
+        output_mask = int(output_mask)  # Convertir a entero si no lo es
+        for input_val in range(0, 2 ** n):
             input_val_xor_input_mask = input_val ^ (input_val & input_mask)
             output_val = sbox[input_val]
-
             if isinstance(output_val, np.ndarray):
                 output_val_scalar = np.sum(output_val)
             else:
                 output_val_scalar = output_val
-
             if isinstance(output_val_scalar, np.ndarray):
                 output_val_scalar = output_val_scalar.item()
-
             output_val_scalar = int(output_val_scalar)
             output_val_xor_output_mask = output_val_scalar ^ (
                 output_val_scalar & output_mask)
             sum_ += bin(input_val_xor_input_mask).count(
                 '1') ^ bin(output_val_xor_output_mask).count('1')
-
-        correlation = (-1) ** bin(sum_).count('1')
+        correlation += (-1) ** bin(sum_).count('1')
         correlation = abs(correlation / (2 ** n))
         return correlation
 
@@ -66,30 +60,28 @@ class Test:
     def linearity(sbox):
         n = int(np.log2(len(sbox)))
         max_abs_correlation = 0
-        total_iterations = (2 ** n - 1) ** 2
+
+        total_iterations = (2 ** n - 1) ** 2  # Total de iteraciones
         chunk_size = 4000
 
-        chunks = [(input_mask, output_mask) for input_mask in range(
-            1, 2 ** n) for output_mask in range(1, 2 ** n)]
-
-        correlations = []
+        chunks = []
+        for input_mask in range(1, 2 ** n):
+            for output_mask in range(1, 2 ** n):
+                chunks.append((input_mask, output_mask))
 
         with concurrent.futures.ProcessPoolExecutor() as executor, tqdm(total=total_iterations) as pbar:
             for i in range(0, len(chunks), chunk_size):
-                chunk = chunks[i:i + chunk_size]
+                chunk = chunks[i:i+chunk_size]
                 compute_partial = partial(
                     Test.compute_correlation, sbox=sbox)
                 futures = [executor.submit(compute_partial, *params)
                            for params in chunk]
                 for future in concurrent.futures.as_completed(futures):
                     correlation = future.result()
-                    correlations.append(correlation)
                     max_abs_correlation = max(max_abs_correlation, correlation)
                     pbar.update(len(chunk))
 
-        linearity_value = 1 - 2 * max_abs_correlation
-
-        return correlations, linearity_value
+        return 1 - 2 * max_abs_correlation
 
     @staticmethod
     def plot_correlations(correlations, title):
