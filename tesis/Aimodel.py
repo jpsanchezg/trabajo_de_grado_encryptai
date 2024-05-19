@@ -3,7 +3,7 @@ from pymoo.core.problem import Problem
 from pymoo.optimize import minimize
 import numpy as np
 import random
-from scipy.optimize import differential_evolution
+from scipy.optimize import differential_evolution, dual_annealing
 
 from analisis import Test
 import torch
@@ -15,23 +15,18 @@ class AI_MODEL:
         pass
 
     @staticmethod
-    def sbox_cost(params, rows=8, cols=64):  # Ahora recibe una población de S-boxes
-        sboxes = np.array(params).reshape(-1, rows, cols)
-        costs = []
-        for sbox in sboxes:
-            correlation = np.corrcoef(sbox.flatten(), sbox.flatten())[0, 1]
-            cost_correlation = -abs(correlation)
+    def sbox_cost(sbox, rows=8, cols=64):  # Corrected signature
+        correlation = np.corrcoef(sbox.flatten(), sbox.flatten())[0, 1]
+        cost_correlation = -abs(correlation)
 
-            average_sac = Test.calculate_average_sac(sbox)
-            cost_sac = -(average_sac - 0.4)**2
+        average_sac = Test.calculate_average_sac(sbox)
+        cost_sac = -(average_sac - 0.4) ** 2
 
-            total_cost = 0.3 * cost_correlation + 0.7 * cost_sac
-            costs.append(total_cost)
-
-        return costs
+        total_cost = 0.3 * cost_correlation + 0.7 * cost_sac
+        return total_cost
 
     @staticmethod
-    def generate_sboxes(num_sboxes, rows=4, cols=16):
+    def generate_sboxes_differential_evolution(num_sboxes, rows=4, cols=16):
         sboxes = []
         bounds = [(0, 31) for _ in range(rows * cols)]
         for _ in range(num_sboxes):
@@ -40,7 +35,7 @@ class AI_MODEL:
             result = differential_evolution(
                 AI_MODEL.sbox_cost,
                 bounds,
-                args=(rows, cols),  # Pass the rows and cols to sbox_cost
+                args=(rows, cols),  # Pass arguments as a tuple
                 maxiter=100,
                 popsize=15,
                 disp=False,
@@ -51,7 +46,21 @@ class AI_MODEL:
         return sboxes
 
     @staticmethod
-    def geneticModel(num_sboxes, population_size):
+    def generate_sboxes_SA(num_sboxes, rows=4, cols=16):
+        sboxes = []
+        bounds = [(0, 31) for _ in range(rows * cols)]
+        for _ in range(num_sboxes):
+            initial_sbox = list(range(rows * cols))
+            random.shuffle(initial_sbox)
+
+            result = dual_annealing(
+                AI_MODEL.sbox_cost, bounds, x0=initial_sbox, maxiter=1000
+            )
+            optimized_sbox = np.reshape(result.x, (rows, cols)).tolist()
+            sboxes.append(optimized_sbox)
+        return sboxes
+    @staticmethod
+    def geneticModel(num_sboxes, rows=4, cols=16, population_size=100, initial_sboxes=None):
         num_variables = num_sboxes * 64
         lower_bound = 0
         upper_bound = 31
@@ -102,6 +111,24 @@ class AI_MODEL:
                 if probability < min_differential_probability:
                     min_differential_probability = probability
         return min_differential_probability
+
+    @staticmethod
+    def generate_sboxes_combined(num_sboxes, rows=4, cols=16):
+        de_sboxes = AI_MODEL.generate_sboxes_differential_evolution(
+            num_sboxes, rows, cols)
+        sa_sboxes = AI_MODEL.generate_sboxes_SA(num_sboxes, rows, cols)
+
+        return de_sboxes, sa_sboxes
+    @staticmethod
+    def geneticModel_combined(num_sboxes, rows=4, cols=16, population_size=100, initial_sboxes=None):
+        de_sboxes, sa_sboxes = AI_MODEL.generate_sboxes_combined(
+            num_sboxes, rows, cols)
+
+        combined_sboxes = de_sboxes + sa_sboxes  # Combine both sets
+
+        # Pass combined_sboxes as initial_sboxes (if applicable)
+        return AI_MODEL.geneticModel(num_sboxes, rows, cols, population_size, initial_sboxes=combined_sboxes)
+
 
 
 class SboxProblem(Problem):

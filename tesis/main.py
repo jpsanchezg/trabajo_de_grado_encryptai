@@ -119,14 +119,22 @@ def main():
 
     # DES with AI
 
-    print("Encryption with Genetic Algorithm")
+    print("Encryption with Genetic Algorithm with SA ")
 
 
-    population_size = 100
-    sbox_genetic, best_score = AI_MODEL.geneticModel(
-        num_sboxes, population_size)
+
+    de_sboxes, sa_sboxes = AI_MODEL.generate_sboxes_combined(
+        num_sboxes)
+    print("Differential Evolution S-boxes:")
+    print(de_sboxes)
+    print("\nSimulated Annealing S-boxes:")
+    print(sa_sboxes)
+
+
+    # Use combined sboxes in geneticModel:
+    sbox_genetic, best_score = AI_MODEL.geneticModel_combined(num_sboxes)
+
     best_score = np.round(best_score, 2)
-    print("Best score: ", best_score)
     print("Encryption with AI")
     cipher_text_with_AI = DES.bin_to_hex(Encryption.encrypt(
         pt, rkb_with_AI, rk_with_AI, sbox_genetic.reshape(num_sboxes, 4, 16)))
@@ -137,8 +145,8 @@ def main():
     plain_text_with_AI = Decryption.decrypt(
         cipher_text_with_AI, rkb_with_AI, rk_with_AI, sbox_genetic.reshape(num_sboxes, 4, 16))
     print("Decrypt result text with AI: ", plain_text_with_AI)
-  
-    
+    print("Best Solution:", sbox_genetic)
+
     print("Encryption with Q-Learning")
     agent = QLearningAgent(num_sboxes)
     sbox_qlearning, best_score = agent.train()
@@ -156,36 +164,46 @@ def main():
         cipher_text_with_AI, rkb_with_AI, rk_with_AI, sbox_qlearning.reshape(num_sboxes, 4, 16))
     print("Decrypt result text with AI: ", plain_text_with_AI)
 
-    ## Test the linearity of the S-boxes
-    #for sbox, label in zip([des_sbox, sbox_genetic, sbox_qlearning], ['Normal', 'Genética', 'Q-learning']):
-    #    correlations, linearity_value = Test.linearity(sbox)
-    #    print(f'Linealidad para S-box {label}: {linearity_value}')
-    #    Test.plot_correlations(
-    #        correlations, f'Correlaciones para S-box {label}')
-    
+    #Test the linearity of the S-boxes
+    sboxdes = np.array(des_sbox, dtype=np.int32)
+    linearity_values = Test.linearity(sboxdes)
+    print("Lineal correlation Sboxes Des:", linearity_values)
+
+    sboxgenetic = np.array(sbox_genetic, dtype=np.int32)
+    linearity_values = Test.linearity(sboxgenetic)
+    print("Lineal correlation Sboxes Genetic:", linearity_values)
+
+    sboxqlearning = np.array(sbox_qlearning, dtype=np.int32)
+    linearity_values = Test.linearity(sboxqlearning)
+    print("Lineal correlation Sboxes Genetic:", linearity_values)
+
 
     # preparando las sboces para el SAC (SAC: Strict Avalanche Criterion)
-    sbox_genetic = np.array(sbox_genetic)
-    sbox_genetic = np.array(sbox_genetic).reshape(8, 64)
+    sbox_genetic = np.array(
+        sbox_genetic, dtype=np.uint8).reshape(8, 64)
     
-    des_sbox = np.array(des_sbox)
-    des_sbox = np.array(des_sbox).reshape(8, 64)
+    des_sbox = np.array(des_sbox, dtype=np.uint8).reshape( 8, 64)
 
-    sbox_qlearning = np.array(sbox_qlearning)
-    sbox_qlearning = np.array(sbox_qlearning).reshape(8, 64)
+    #sbox_qlearning = np.array(sbox_qlearning)
+    #sbox_qlearning = np.array(sbox_qlearning).reshape(8, 64)
+    print("")
+    print("")
     print("Normal Sboxes")
     print("")
     for i, sbox in enumerate(des_sbox):
-        average_sac = Test.calculate_average_sac(sbox)
+        average_sac = Test.calculate_average_sac_results(sbox)
         print(f"S-box {i + 1}: Average SAC for Normal sboxes = {average_sac:.2f}")
 
-
+    print("")
+    print("")
     print("Genetic Algorithm")
     print("")
     for i, sbox in enumerate(sbox_genetic):
-        average_sac = Test.calculate_average_sac(sbox)
+        average_sac = Test.calculate_average_sac_results(sbox)
         print(
             f"S-box {i + 1}: Average SAC for Genetic sboxes= {average_sac:.2f}")
+    print("")
+    print("")
     print("Q Learning")
     print("")
     for i, sbox in enumerate(sbox_qlearning):

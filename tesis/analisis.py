@@ -110,7 +110,21 @@ class Test:
         ax.set_title(title)
         plt.show()
     
-    def calculate_average_sac(sbox_row):
+    def calculate_average_sac(sbox):
+        changed_bits = []
+        for y in sbox:
+            y = np.array(y, dtype=np.uint8)
+            y_flipped = np.flip(y)
+            xor_result = np.bitwise_xor(y, y_flipped)
+
+            # Count '1's in the XOR result directly
+            # Use unpackbits for efficient counting
+            changed_bits.append(np.unpackbits(xor_result).sum())
+            # or (alternative) changed_bits.append(bin(int(xor_result)).count('1'))
+
+        return np.mean(changed_bits)
+
+    def calculate_average_sac_results(sbox_row):
         sbox = sbox_row.reshape(1, -1)
 
         sac_values = []
@@ -127,5 +141,5 @@ class Test:
                 changed_bits.append(bin(y ^ y_flipped).count("1"))
             # Promedio de bits cambiados (normalizado)
             sac_values.append(sum(changed_bits) / 512)
-    
+
         return np.mean(sac_values)
