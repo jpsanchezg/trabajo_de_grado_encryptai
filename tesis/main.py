@@ -156,10 +156,11 @@ def main():
 
     desboxes = np.array(de_sboxes, dtype=np.int32)
     sasboxes = np.array(sa_sboxes, dtype=np.int32)
-    lineality_de = Test.linearity(desboxes)
-    lineality_sa = Test.linearity(sasboxes)
-    print("Lineal correlation Sboxes Des:", lineality_de)
-    print("Lineal correlation Sboxes SA:", lineality_sa)
+    #print("Sboxes SA: ", sasboxes)
+    #lineality_de = Test.linearity(desboxes)
+    #lineality_sa = Test.linearity(sasboxes)
+    #print("Lineal correlation Sboxes Des:", lineality_de)
+    #print("Lineal correlation Sboxes SA:", lineality_sa)
 
 
     # Use combined sboxes in geneticModel:
@@ -198,62 +199,48 @@ def main():
     print("")
     #print("Testing the Nonlinearity of the S-boxes")
     #print("")
-    ##Test the linearity of the S-boxes
+    #Test the linearity of the S-boxes
     #sboxdes = np.array(des_sbox, dtype=np.int32)
     #linearity_values_des = Test.linearity(sboxdes)
     #print("")
     #
 #
-    #sboxgenetic = np.array(sbox_genetic, dtype=np.int32)
-    #linearity_values_genetic = Test.linearity(sboxgenetic)
-    #print("")
-    #
+    sboxgenetic = np.array(sbox_genetic, dtype=np.int32)
+    linearity_values_genetic = Test.linearity(sboxgenetic)
+    print("")
+    
 #
-    #sboxqlearning = np.array(sbox_qlearning, dtype=np.int32)
-    #linearity_values_qlearning = Test.linearity(sboxqlearning)
-    #print("")
-    #print("Lineal correlation Sboxes Des:", linearity_values_des)
-    #print("")
-    #print("Lineal correlation Sboxes Genetic:", linearity_values_genetic)
-    #print("")
-    #print("Lineal correlation Sboxes Qlearning:", linearity_values_qlearning)
+    sboxqlearning = np.array(sbox_qlearning, dtype=np.int32)
+    linearity_values_qlearning = Test.linearity(sboxqlearning)
+    print("")
+    print("NonLineal correlation Sboxes Des:", linearity_values_des)
+    print("")
+    print("NonLineal correlation Sboxes Genetic:", linearity_values_genetic)
+    print("")
+    print("NonLineal correlation Sboxes Qlearning:", linearity_values_qlearning)
 
 
     # preparando las sboxes para el SAC (SAC: Strict Avalanche Criterion)
-    sbox_genetic = np.array(
-        sbox_genetic, dtype=np.uint8).reshape(num_sboxes, num_sboxes*num_sboxes)
-
-    des_sbox = np.array(des_sbox, dtype=np.uint8).reshape(
-        num_sboxes, num_sboxes*num_sboxes)
-
-    sbox_qlearning = np.array(
-        sbox_qlearning, dtype=np.uint8).reshape(num_sboxes, num_sboxes*num_sboxes)
 
 
-    print("")
-    print("")
-    print("Normal Sboxes")
-    print("")
-    for i, sbox in enumerate(des_sbox):
-        average_sac = Test.calculate_average_sac_results(sbox)
-        print(f"S-box {i + 1}: Average SAC for Normal sboxes = {average_sac:.2f}")
-
+    
     print("")
     print("")
     print("Genetic Algorithm")
     print("")
-    for i, sbox in enumerate(sbox_genetic):
-        average_sac = Test.calculate_average_sac_results(sbox)
-        print(
-            f"S-box {i + 1}: Average SAC for Genetic sboxes= {average_sac:.2f}")
+
+    sbox_genetic =  [sbox_genetic[i:i+16] for i in range(0, 256, 16)]
+    print("Sboxes Genetic: ", sbox_genetic)
+    genetic_sac = Test.calculate_average_sac_for_multiple_sboxes(sbox_genetic)
+    print(f"Average SAC for Genetic sboxes= {genetic_sac:.4f}")
+
     print("")
     print("")
     print("Q Learning")
     print("")
-    for i, sbox in enumerate(sbox_qlearning):
-        average_sac = Test.calculate_average_sac_results(sbox)
-        print(
-            f"S-box {i + 1}: Average SAC for Q Learning sboxes= {average_sac:.2f}")
+    sbox_qlearning =  [sbox_qlearning[i:i+16] for i in range(0, 256, 16)]
+    qlearning_sac = Test.calculate_average_sac_for_multiple_sboxes(sbox_qlearning)
+    print(f"Average SAC for Q Learning sboxes= {qlearning_sac:.4f}")
     print("")
     print("")
 

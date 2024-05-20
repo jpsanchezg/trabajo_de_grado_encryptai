@@ -42,7 +42,10 @@ class AI_MODEL:
                 polish=True,
             )
             optimized_sbox = np.reshape(result.x, (rows, cols)).tolist()
-            sboxes.append(optimized_sbox)
+            optimized_sbox = np.round(optimized_sbox)
+            average_sac = Test.calculate_average_sac(optimized_sbox)
+            if average_sac > 0.45:
+                sboxes.append(optimized_sbox)
         return sboxes
 
     @staticmethod
@@ -56,8 +59,13 @@ class AI_MODEL:
             result = dual_annealing(
                 AI_MODEL.sbox_cost, bounds, x0=initial_sbox, maxiter=1000
             )
+            
             optimized_sbox = np.reshape(result.x, (rows, cols)).tolist()
-            sboxes.append(optimized_sbox)
+            optimized_sbox = np.round(optimized_sbox)
+
+            average_sac = Test.calculate_average_sac(optimized_sbox)
+            if average_sac > 0.45:
+                sboxes.append(optimized_sbox)
         return sboxes
     @staticmethod
     def geneticModel(num_sboxes, rows=4, cols=16, population_size=100, initial_sboxes=None):
