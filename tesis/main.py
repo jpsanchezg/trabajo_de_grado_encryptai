@@ -139,18 +139,9 @@ def main():
     print("Plain Text without AI: ", plain_text_without_AI)
     mensaje_decodificado_hex = limitar_y_mapear(
         plain_text_without_AI, diccionario_hex_inverso)
-
-    
-    
-
-    
-
     # DES with AI
 
     print("Encryption with Genetic Algorithm with SA ")
-
-
-
     de_sboxes, sa_sboxes = AI_MODEL.generate_sboxes_combined(
         num_sboxes)
 

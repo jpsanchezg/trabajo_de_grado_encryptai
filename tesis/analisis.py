@@ -136,4 +136,4 @@ class Test:
                 sac_value = Test.calculate_average_sac_results(
                     np.array(sbox_row))
                 all_sac_values.append(sac_value)
-        return np.mean(all_sac_values) *10
+        return np.mean(all_sac_values)
